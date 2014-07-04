@@ -292,7 +292,9 @@ int main(int argc, char *argv[])
 	if (argc != 4 && (argc != 3 || strcmp(argv[2], "-lsdir")))
 		ExitWithError(&oraAllInOne, 1, ERROR_USAGE, "Invalid number of arguments\n");
 		/* 1 - Error in command line arguments */
-	strcpy(connectionString, argv[1]); /* TODO: replace with strncpy to avoid buffer overflow */
+	strncpy(connectionString, argv[1], sizeof(connectionString));
+	if (connectionString[sizeof(connectionString) - 1])
+		ExitWithError(&oraAllInOne, 1, ERROR_NONE, "Oracle connection string is too long\n");
 	pwdptr = strchr(connectionString, '/');
 	if (pwdptr)
 		*pwdptr++ = '\0';
@@ -336,8 +338,12 @@ int main(int argc, char *argv[])
 		strncpy(vDirectory, remoteArg, fileNamePtr - remoteArg);
 		vDirectory[fileNamePtr - remoteArg] = '\0';
 
-		strcpy(vLocalFile, localArg); /* TODO: replace with strncpy to avoid buffer overflow */
-		strcpy(vRemoteFile, fileNamePtr + 1); /* TODO: replace with strncpy to avoid buffer overflow */
+		strncpy(vLocalFile, localArg, sizeof(vLocalFile));
+		if (vLocalFile[sizeof(vLocalFile) - 1])
+			ExitWithError(&oraAllInOne, 1, ERROR_NONE, "Local file name is too long\n");
+		strncpy(vRemoteFile, fileNamePtr + 1, sizeof(vRemoteFile));
+		if (vRemoteFile[sizeof(vRemoteFile) - 1])
+			ExitWithError(&oraAllInOne, 1, ERROR_NONE, "Remote file name is too long\n");
 #ifdef DEBUG
 		printf("Copying %s Oracle. Local file %s, remote file %s, directory %s\n",
 			   programAction == ACTION_READ ? "FROM" : "TO", vLocalFile, vRemoteFile, vDirectory);
