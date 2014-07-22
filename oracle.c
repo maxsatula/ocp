@@ -146,11 +146,33 @@ void ExitWithError(struct ORACLEALLINONE *oraAllInOne, int exitCode, enum ERROR_
 
 	if (oraAllInOne->currentStmt)
 		ReleaseStmt(oraAllInOne);
-	if (oraAllInOne->svchp)
+
+	if (oraAllInOne->srvhp)
 	{
-		OCILogoff(oraAllInOne->svchp, oraAllInOne->errhp);
-		oraAllInOne->svchp = 0;
+		if (oraAllInOne->svchp)
+		{
+			OCISessionEnd(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->usrhp, OCI_DEFAULT);
+			OCIHandleFree(oraAllInOne->svchp, OCI_HTYPE_SVCCTX);
+			oraAllInOne->svchp = 0;
+		}
+		if (oraAllInOne->usrhp)
+		{
+			OCIHandleFree(oraAllInOne->usrhp, OCI_HTYPE_SESSION);
+			oraAllInOne->usrhp = 0;
+		}
+		OCIServerDetach(oraAllInOne->srvhp, oraAllInOne->errhp, OCI_DEFAULT);
+		OCIHandleFree(oraAllInOne->srvhp, OCI_HTYPE_SERVER);
+		oraAllInOne->srvhp = 0;
 	}
+	else
+	{
+		if (oraAllInOne->svchp)
+		{
+			OCILogoff(oraAllInOne->svchp, oraAllInOne->errhp);
+			oraAllInOne->svchp = 0;
+		}
+	}
+
 	if (oraAllInOne->errhp)
 	{
 		OCIHandleFree(oraAllInOne->errhp, OCI_HTYPE_ERROR);
@@ -186,12 +208,55 @@ void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
 		ExitWithError(oraAllInOne, 2, ERROR_NONE, "Failed to initialize OCIError\n");
 	}
 
-	if (OCILogon2(oraAllInOne->envhp, oraAllInOne->errhp, &oraAllInOne->svchp,
-	              (text*)userName, (ub4)strlen(userName),
-	              (text*)password, (ub4)strlen(password),
-	              (text*)connection, (ub4)strlen(connection), OCI_DEFAULT))
+	if (*userName)
 	{
-		ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to login to a database\n");
-		/* 3 - Failed to login to a database */
+		if (OCILogon2(oraAllInOne->envhp, oraAllInOne->errhp, &oraAllInOne->svchp,
+		              (text*)userName, (ub4)strlen(userName),
+		              (text*)password, (ub4)strlen(password),
+		              (text*)connection, (ub4)strlen(connection), OCI_DEFAULT))
+		{
+			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to login to a database\n");
+			/* 3 - Failed to login to a database */
+		}
+	}
+	else
+	{
+		if (OCIHandleAlloc(oraAllInOne->envhp, (void*) &oraAllInOne->srvhp, OCI_HTYPE_SERVER, 0, 0))
+		{
+			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to attach to a server\n");
+		}
+
+		if (OCIServerAttach(oraAllInOne->srvhp, oraAllInOne->errhp,
+		                    (text*)connection, (ub4)strlen(connection), OCI_DEFAULT))
+		{
+			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to attach to server\n");
+		}
+
+		if (OCIHandleAlloc(oraAllInOne->envhp, (void*) &oraAllInOne->svchp, OCI_HTYPE_SVCCTX, 0, 0))
+		{
+			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to login to a database\n");
+		}
+
+		if (OCIAttrSet(oraAllInOne->svchp, OCI_HTYPE_SVCCTX,
+		               oraAllInOne->srvhp, 0, OCI_ATTR_SERVER, oraAllInOne->errhp))
+		{
+			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to login to a database\n");
+		}
+
+		if (OCIHandleAlloc(oraAllInOne->envhp, (void*) &oraAllInOne->usrhp, OCI_HTYPE_SESSION, 0, 0))
+		{
+			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to login to a database\n");
+		}
+
+		if (OCISessionBegin(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->usrhp, OCI_CRED_EXT, OCI_DEFAULT))
+		{
+			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to login to a database\n");
+		}
+
+		if (OCIAttrSet(oraAllInOne->svchp, OCI_HTYPE_SVCCTX,
+		               oraAllInOne->usrhp, 0, OCI_ATTR_SESSION, oraAllInOne->errhp))
+		{
+			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to login to a database\n");
+		}
 	}
 }

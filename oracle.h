@@ -59,6 +59,8 @@ struct ORACLEALLINONE
 	OCIEnv *envhp;
 	OCIError *errhp;
 	OCISvcCtx *svchp;
+	OCIServer *srvhp;
+	OCISession *usrhp;
 	struct ORACLESTATEMENT *currentStmt;
 };
 
