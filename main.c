@@ -39,7 +39,7 @@ enum PROGRAM_ACTION { ACTION_READ, ACTION_WRITE, ACTION_LSDIR, ACTION_LS };
 void LsDir(struct ORACLEALLINONE *oraAllInOne)
 {
 	sword ociResult;
-	char vDirectory[MAX_FMT_SIZE];
+	char vDirectory[31];
 	char vDirectoryPath[MAX_FMT_SIZE];
 	char vGrantable1[MAX_FMT_SIZE];
 	char vGrantable2[MAX_FMT_SIZE];
@@ -94,6 +94,82 @@ SELECT d.directory_name,\
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to list oracle directories\n");
 
 	ReleaseStmt(oraAllInOne);
+}
+
+void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory)
+{
+	sword ociResult;
+	char vDirectory[31];
+	char vFileName[MAX_FMT_SIZE];
+	ub8 vBytes;
+	char vLastModified[7];
+	int i;
+	long totalBytes;
+
+	struct BINDVARIABLE oraBindsLs[] =
+	{
+		{ 0, SQLT_STR, ":directory", vDirectory, sizeof(vDirectory)-1 }
+	};
+
+	struct ORACLEDEFINE oraDefinesLs[] =
+	{
+		{ 0, SQLT_STR, vFileName,     sizeof(vFileName)-1,   0 },
+		{ 0, SQLT_INT, &vBytes,       sizeof(vBytes),        0 },
+		{ 0, SQLT_DAT, vLastModified, sizeof(vLastModified), 0 }
+	};
+
+	struct ORACLESTATEMENT oraStmtLs = { "\
+SELECT t.file_name,\
+       t.bytes,\
+       t.last_modified\
+  FROM all_directories d,\
+       TABLE(f_ocp_dir_list(d.directory_path)) t\
+ WHERE d.directory_name = :directory",
+	       0, oraBindsLs, sizeof(oraBindsLs)/sizeof(struct BINDVARIABLE),
+	       oraDefinesLs, sizeof(oraDefinesLs)/sizeof(struct ORACLEDEFINE) };
+
+	strncpy(vDirectory, pDirectory, sizeof(vDirectory));
+	if (vDirectory[sizeof(vDirectory) - 1])
+		ExitWithError(oraAllInOne, 1, ERROR_NONE, "Oracle directory name is too long\n");
+
+	PrepareStmtAndBind(oraAllInOne, &oraStmtLs);
+
+	if (ExecuteStmt(oraAllInOne))
+		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to list files in oracle directory\n");
+
+	printf("Contents of %s directory\n\
+%-40s %-12s %s\n\
+---------------------------------------- ------------ -------------------\n",
+	       vDirectory, "File Name", "    Size", "Last Modified");
+
+	i = 0;
+	totalBytes = 0;
+	do
+	{
+		printf("%-40s %12ld %02d/%02d/%d %02d:%02d:%02d\n",
+			   vFileName,
+			   vBytes,
+		       (int)vLastModified[2],
+		       (int)vLastModified[3],
+			   ((int)vLastModified[0]-100) * 100 + ((int)vLastModified[1] - 100),
+		       (int)vLastModified[4] - 1,
+		       (int)vLastModified[5] - 1,
+		       (int)vLastModified[6] - 1);
+		i++;
+		totalBytes += vBytes;
+
+		ociResult = OCIStmtFetch2(oraStmtLs.stmthp, oraAllInOne->errhp, 1,
+								  OCI_FETCH_NEXT, 1, OCI_DEFAULT);
+	}
+	while (ociResult == OCI_SUCCESS);
+
+	if (ociResult != OCI_NO_DATA)
+		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to list files in oracle directory\n");
+
+	printf("---------------------------------------- ------------ -------------------\n\
+%5d File(s) %39ld\n", i, totalBytes);
+
+	ReleaseStmt(oraAllInOne);	
 }
 
 void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
@@ -282,7 +358,7 @@ int main(int argc, char *argv[])
 	char connectionString[MAX_FMT_SIZE];
 	char *pwdptr, *dbconptr;
 	enum PROGRAM_ACTION programAction;
-	char vDirectory[MAX_FMT_SIZE];
+	char vDirectory[31];
 	char vLocalFile[MAX_FMT_SIZE];
 	char vRemoteFile[MAX_FMT_SIZE];
 	char* fileNamePtr;
@@ -358,7 +434,7 @@ int main(int argc, char *argv[])
 		LsDir(&oraAllInOne);
 		break;
 	case ACTION_LS:
-		ExitWithError(&oraAllInOne, 5, ERROR_NONE, "Not implemented yet: -ls DIRECTORY\n");
+		Ls(&oraAllInOne, argv[3]);
 		break;
 	case ACTION_READ:
 	case ACTION_WRITE:
