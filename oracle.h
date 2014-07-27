@@ -24,7 +24,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #define MAX_FMT_SIZE 4096
 
-enum ERROR_CLASS { ERROR_NONE, ERROR_OCI, ERROR_OS, ERROR_USAGE };
+enum ERROR_CLASS { ERROR_NONE, ERROR_OCI, ERROR_OS };
 
 struct BINDVARIABLE
 {

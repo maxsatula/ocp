@@ -22,19 +22,18 @@ from/to Oracle Database directories (e.g. DATA_PUMP_DIR) using Oracle SQL Net
 connection only.
 Hence no physical or file system access required to a database server. 
 
-Tested and compiled with:
-	cc -q64 -I$ORACLE_HOME/rdbms/public -L$ORACLE_HOME/lib -lclntsh -oocp main.c
-
 *****************************************************************************/
 
 #include <stdio.h>
 #include <string.h>
+#include <popt.h>
 #include <oci.h>
 #include "oracle.h"
 
 #define ORA_RAW_BUFFER_SIZE 0x2000
 
-enum PROGRAM_ACTION { ACTION_READ, ACTION_WRITE, ACTION_LSDIR, ACTION_LS };
+enum PROGRAM_ACTION { ACTION_READ, ACTION_WRITE, ACTION_LSDIR, ACTION_LS, ACTION_RM,
+	ACTION_GZIP, ACTION_GUNZIP, ACTION_INSTALL, ACTION_DEINSTALL };
 
 void LsDir(struct ORACLEALLINONE *oraAllInOne)
 {
@@ -96,7 +95,7 @@ SELECT d.directory_name,\
 	ReleaseStmt(oraAllInOne);
 }
 
-void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory)
+void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 {
 	sword ociResult;
 	char vDirectory[31];
@@ -118,13 +117,8 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory)
 		{ 0, SQLT_DAT, vLastModified, sizeof(vLastModified), 0 }
 	};
 
-	struct ORACLESTATEMENT oraStmtLs = { "\
-SELECT t.file_name,\
-       t.bytes,\
-       t.last_modified\
-  FROM all_directories d,\
-       TABLE(f_ocp_dir_list(d.directory_path)) t\
- WHERE d.directory_name = :directory",
+	struct ORACLESTATEMENT oraStmtLs = {
+	       sql,
 	       0, oraBindsLs, sizeof(oraBindsLs)/sizeof(struct BINDVARIABLE),
 	       oraDefinesLs, sizeof(oraDefinesLs)/sizeof(struct ORACLEDEFINE) };
 
@@ -353,24 +347,187 @@ end;",
 	ReleaseStmt(oraAllInOne);
 }
 
-int main(int argc, char *argv[])
+struct PROGRAM_OPTIONS
+{
+	enum PROGRAM_ACTION programAction;
+	const char* lsDirectoryName;
+	int compressionLevel;
+	int isBackground;
+	const char* connectionString;
+};
+
+void ExitWithUsage(poptContext* poptcon)
+{
+	poptPrintUsage(*poptcon, stderr, 0);
+	exit(1);
+	/* 1 - Error in command line arguments */
+}
+
+void SplitToDirectoryAndFileName(poptContext *poptcon, char* pDirectory, char* pFileName)
+{
+	const char* remoteArg;
+	const char* fileNamePtr;
+
+	remoteArg = poptGetArg(*poptcon);
+	if (!remoteArg)
+	{
+		fprintf(stderr, "Missing filename\n");
+		ExitWithUsage(poptcon);
+	}
+
+	fileNamePtr = strchr(remoteArg, ':');
+	if (!fileNamePtr)
+	{
+		fprintf(stderr, "Missing a colon ':' which separates directory name and file name\n");
+		ExitWithUsage(poptcon);
+	}
+
+	if (fileNamePtr - remoteArg >= 31)
+	{
+		fprintf(stderr, "Oracle Directory name is too long\n");
+		ExitWithUsage(poptcon);
+	}
+
+	strncpy(pDirectory, remoteArg, fileNamePtr - remoteArg);
+	pDirectory[fileNamePtr - remoteArg] = '\0';
+	strncpy(pFileName, fileNamePtr + 1, MAX_FMT_SIZE);
+	if (pFileName[MAX_FMT_SIZE - 1])
+	{
+		fprintf(stderr, "File name is too long\n");
+		ExitWithUsage(poptcon);
+	}
+}
+
+int main(int argc, const char *argv[])
 {
 	char connectionString[MAX_FMT_SIZE];
 	char *pwdptr, *dbconptr;
-	enum PROGRAM_ACTION programAction;
 	char vDirectory[31];
 	char vLocalFile[MAX_FMT_SIZE];
 	char vRemoteFile[MAX_FMT_SIZE];
-	char* fileNamePtr;
-	char *localArg, *remoteArg;
+	const char* fileNamePtr;
+	const char *localArg, *remoteArg;
+	char* sqlLsPtr;
+	char sqlLs[10000] = "\
+SELECT t.file_name,\
+       t.bytes,\
+       t.last_modified\
+  FROM all_directories d,\
+       TABLE(f_ocp_dir_list(d.directory_path)) t\
+ WHERE d.directory_name = :directory";
 	struct ORACLEALLINONE oraAllInOne = { 0, 0, 0, 0 };
+	struct PROGRAM_OPTIONS programOptions;
+	poptContext poptcon;
+	int rc;
 
-	if (argc != 4 && (argc != 3 || strcmp(argv[2], "-lsdir")))
-		ExitWithError(&oraAllInOne, 1, ERROR_USAGE, "Invalid number of arguments\n");
-		/* 1 - Error in command line arguments */
-	strncpy(connectionString, argv[1], sizeof(connectionString));
+	struct poptOption compressionOptions[] =
+	{
+		{ "gzip", '\0', POPT_ARG_NONE, 0, ACTION_GZIP, "Compress file in Oracle directory" },
+		{ "gunzip", '\0', POPT_ARG_NONE, 0, ACTION_GUNZIP, "Decompress file in Oracle directory" },
+		{ "fast", '1', POPT_ARG_NONE, 0, 0x81, "Fastest compression method" },
+		{ NULL, '2', POPT_ARG_NONE | POPT_ARGFLAG_DOC_HIDDEN, 0, 0x82 },
+		{ NULL, '3', POPT_ARG_NONE | POPT_ARGFLAG_DOC_HIDDEN, 0, 0x83 },
+		{ NULL, '4', POPT_ARG_NONE | POPT_ARGFLAG_DOC_HIDDEN, 0, 0x84 },
+		{ NULL, '5', POPT_ARG_NONE | POPT_ARGFLAG_DOC_HIDDEN, 0, 0x85 },
+		{ NULL, '6', POPT_ARG_NONE | POPT_ARGFLAG_DOC_HIDDEN, 0, 0x86 },
+		{ NULL, '7', POPT_ARG_NONE | POPT_ARGFLAG_DOC_HIDDEN, 0, 0x87 },
+		{ NULL, '8', POPT_ARG_NONE | POPT_ARGFLAG_DOC_HIDDEN, 0, 0x88 },
+		{ "best", '9', POPT_ARG_NONE, 0, 0x89, "Best compression method" },
+		{ "background", 'b', POPT_ARG_VAL, &programOptions.isBackground, 1, "Submit Oracle Scheduler job and exit immediately" },
+		POPT_TABLEEND
+	};
+
+	struct poptOption objOptions[] =
+	{
+		{ "install", '\0', POPT_ARG_NONE, 0, ACTION_INSTALL, "Install objects" },
+		{ "deinstall", '\0', POPT_ARG_NONE, 0, ACTION_DEINSTALL, "Deinstall objects" },
+		POPT_TABLEEND
+	};
+
+	struct poptOption options[] =
+	{
+		{ "list-directories", '\0', POPT_ARG_NONE, 0, ACTION_LSDIR, "List Oracle directories" },
+		{ "ls", '\0', POPT_ARG_STRING, &programOptions.lsDirectoryName, ACTION_LS, "List files in Oracle directory", "DIRECTORY" },
+		{ "rm", '\0', POPT_ARG_NONE, 0, ACTION_RM, "Remove file from Oracle directory" },
+		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, compressionOptions, 0, "Compression options:" },
+		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, objOptions, 0, "Database objects for --ls support:" },
+		POPT_AUTOHELP
+		POPT_TABLEEND
+	};
+
+	programOptions.programAction = ACTION_READ;
+	programOptions.lsDirectoryName = 0;
+	programOptions.compressionLevel = 0;
+	programOptions.isBackground = 0;
+	programOptions.connectionString = 0;
+
+	poptcon = poptGetContext(NULL, argc, argv, options, 0);
+	while ((rc = poptGetNextOpt(poptcon)) >= 0)
+	{
+		switch (rc)
+		{
+		case 0x81:
+		case 0x82:
+		case 0x83:
+		case 0x84:
+		case 0x85:
+		case 0x86:
+		case 0x87:
+		case 0x88:
+		case 0x89:
+			if (programOptions.compressionLevel)
+			{
+				fprintf(stderr, "Mutually exclusive compression levels specified\n");
+				ExitWithUsage(&poptcon);
+			}
+			programOptions.compressionLevel = rc - 0x80;
+			break;
+		default:
+			if (programOptions.programAction)
+			{
+				fprintf(stderr, "Mutually exclusive options specified\n");
+				ExitWithUsage(&poptcon);
+			}
+			programOptions.programAction = rc;
+			break;
+		}
+	}
+
+	if (rc < -1)
+	{
+		fprintf(stderr, "Error with option [%s]: %s\n",
+			poptBadOption(poptcon, POPT_BADOPTION_NOALIAS),
+			poptStrerror(rc));
+		ExitWithUsage(&poptcon);
+	}
+
+	if (programOptions.compressionLevel && programOptions.programAction != ACTION_READ &&
+		programOptions.programAction != ACTION_WRITE && programOptions.programAction != ACTION_GZIP)
+	{
+		fprintf(stderr, "Compression level can only be specified for transfer or gzip mode\n");
+		ExitWithUsage(&poptcon);
+	}
+
+	if (programOptions.isBackground && programOptions.programAction != ACTION_GZIP && programOptions.programAction != ACTION_GUNZIP)
+	{
+		fprintf(stderr, "Background mode can only be specified for gzip/gunzip mode\n");
+		ExitWithUsage(&poptcon);
+	}
+
+	programOptions.connectionString = poptGetArg(poptcon);
+	if (!programOptions.connectionString)
+	{
+		fprintf(stderr, "No Oracle connection string specified\n");
+		ExitWithUsage(&poptcon);
+	}
+
+	strncpy(connectionString, programOptions.connectionString, sizeof(connectionString));	
 	if (connectionString[sizeof(connectionString) - 1])
-		ExitWithError(&oraAllInOne, 1, ERROR_NONE, "Oracle connection string is too long\n");
+	{
+		fprintf(stderr, "Oracle connection string is too long\n");
+		ExitWithUsage(&poptcon);
+	}
+
 	pwdptr = strchr(connectionString, '/');
 	if (pwdptr)
 		*pwdptr++ = '\0';
@@ -378,37 +535,50 @@ int main(int argc, char *argv[])
 	if (dbconptr)
 		*dbconptr++ = '\0';
 	else
-		ExitWithError(&oraAllInOne, 1, ERROR_USAGE, "Invalid connection string format\n");
+	{
+		fprintf(stderr, "Invalid connection string format\n");
+		ExitWithUsage(&poptcon);
+	}
 
 #ifdef DEBUG
 	printf("Database connection: %s@%s\n", connectionString, dbconptr);
 #endif
 
-	if (argc == 3)
+	switch (programOptions.programAction)
 	{
-		programAction = ACTION_LSDIR;
-	}
-	else if (!strcmp(argv[2], "-ls"))
-	{
-		programAction = ACTION_LS;
-	}
-	else
-	{
-		fileNamePtr = strchr(argv[2], ':');
-		if (fileNamePtr)
+	case ACTION_READ:
+	case ACTION_WRITE:
+		remoteArg = poptGetArg(poptcon);
+		if (!remoteArg)
 		{
-			programAction = ACTION_READ;
-			localArg = argv[3];
-			remoteArg = argv[2];
+			fprintf(stderr, "Missing two arguments for source and destination files\n");
+			ExitWithUsage(&poptcon);
 		}
-		else
+		localArg = poptGetArg(poptcon);
+		if (!localArg)
 		{
-			programAction = ACTION_WRITE;
-			fileNamePtr = strchr(argv[3], ':');
+			fprintf(stderr, "Missing destination file name\n");
+			ExitWithUsage(&poptcon);
+		}
+
+		fileNamePtr = strchr(remoteArg, ':');
+		if (!fileNamePtr)
+		{
+			programOptions.programAction = ACTION_WRITE;
+			fileNamePtr = remoteArg; remoteArg = localArg; localArg = fileNamePtr;
+
+			fileNamePtr = strchr(remoteArg, ':');
 			if (!fileNamePtr)
-				ExitWithError(&oraAllInOne, 1, ERROR_USAGE, "Missing a colon ':' in one of arguments to specify a remote (Oracle) site\n");
-			localArg = argv[2];
-			remoteArg = argv[3];
+			{
+				fprintf(stderr, "Missing a colon ':' in one of arguments to specify a remote (Oracle) site\n");
+				ExitWithUsage(&poptcon);
+			}
+		}
+
+		if (fileNamePtr - remoteArg >= sizeof(vDirectory))
+		{
+			fprintf(stderr, "Oracle Directory name is too long\n");
+			ExitWithUsage(&poptcon);
 		}
 
 		strncpy(vDirectory, remoteArg, fileNamePtr - remoteArg);
@@ -416,30 +586,126 @@ int main(int argc, char *argv[])
 
 		strncpy(vLocalFile, localArg, sizeof(vLocalFile));
 		if (vLocalFile[sizeof(vLocalFile) - 1])
-			ExitWithError(&oraAllInOne, 1, ERROR_NONE, "Local file name is too long\n");
+		{
+			fprintf(stderr, "Local file name is too long\n");
+			ExitWithUsage(&poptcon);
+		}
 		strncpy(vRemoteFile, fileNamePtr + 1, sizeof(vRemoteFile));
 		if (vRemoteFile[sizeof(vRemoteFile) - 1])
-			ExitWithError(&oraAllInOne, 1, ERROR_NONE, "Remote file name is too long\n");
+		{
+			fprintf(stderr, "Remote file name is too long\n");
+			ExitWithUsage(&poptcon);
+		}
+
 #ifdef DEBUG
 		printf("Copying %s Oracle. Local file %s, remote file %s, directory %s\n",
-			   programAction == ACTION_READ ? "FROM" : "TO", vLocalFile, vRemoteFile, vDirectory);
+			   programOptions.programAction == ACTION_READ ? "FROM" : "TO", vLocalFile, vRemoteFile, vDirectory);
+		if (programOptions.compressionLevel)
+			printf("On-the-fly compression is on, method %d...\n", programOptions.compressionLevel);
+#endif
+		break;
+#ifdef DEBUG
+	case ACTION_LSDIR:
+		printf("Listing directories...\n");
+		break;
+#endif
+	case ACTION_LS:
+		strncpy(vDirectory, programOptions.lsDirectoryName, sizeof(vDirectory));	
+		if (vDirectory[sizeof(vDirectory) - 1])
+		{
+			fprintf(stderr, "Oracle Directory name is too long\n");
+			ExitWithUsage(&poptcon);
+		}
+
+		if (poptPeekArg(poptcon))
+		{
+			strcat(sqlLs, " AND (");
+			while (poptPeekArg(poptcon))
+			{
+				if (strlen(sqlLs) + 25/*approx*/ + strlen(poptPeekArg(poptcon)) >= 1000)
+				{
+					fprintf(stderr, "File list is too long\n");
+					ExitWithUsage(&poptcon);
+				}
+				strcat(sqlLs, "t.file_name like '");
+				sqlLsPtr = sqlLs + strlen(sqlLs);
+				strcpy(sqlLsPtr, poptGetArg(poptcon));
+				while (*sqlLsPtr)
+				{
+					if (*sqlLsPtr == '*')
+						*sqlLsPtr = '%';
+					else if (*sqlLsPtr == '?')
+						*sqlLsPtr = '_';
+					sqlLsPtr++;
+				}
+				strcat(sqlLs, "' OR ");				
+			}
+			sqlLs[strlen(sqlLs)-4] = ')';
+			sqlLs[strlen(sqlLs)-3] = '\0';
+		}
+
+#ifdef DEBUG
+		printf("Listing files in directory %s...\n", vDirectory);
+		printf("SQL: %s\n", sqlLs);
+#endif
+		break;
+	case ACTION_RM:
+		SplitToDirectoryAndFileName(&poptcon, vDirectory, vRemoteFile);
+
+#ifdef DEBUG
+		printf("Removing file %s from directory %s...\n", vRemoteFile, vDirectory);
+#endif
+		break;
+	case ACTION_GZIP:
+		SplitToDirectoryAndFileName(&poptcon, vDirectory, vRemoteFile);
+#ifdef DEBUG
+		printf("Compressing file, compression method %d%s...\n",
+			programOptions.compressionLevel,
+			programOptions.isBackground ? ", in background" : "");
+#endif
+		break;
+	case ACTION_GUNZIP:
+		SplitToDirectoryAndFileName(&poptcon, vDirectory, vRemoteFile);
+#ifdef DEBUG
+		printf("Decompressing file%s...\n",
+			programOptions.isBackground ? ", in background" : "");
+#endif
+		break;
+#ifdef DEBUG
+	case ACTION_INSTALL:
+		printf("Installing objects...\n");
+		break;
+	case ACTION_DEINSTALL:
+		printf("Deinstalling objects...\n");
+		break;
 #endif
 	}
 
+	if (poptGetArg(poptcon))
+	{
+		fprintf(stderr, "Extra arguments found\n");
+		ExitWithUsage(&poptcon);
+	}
+
+	poptFreeContext(poptcon);
+
 	OracleLogon(&oraAllInOne, connectionString, pwdptr, dbconptr);
 
-	switch (programAction)
+	switch (programOptions.programAction)
 	{
 	case ACTION_LSDIR:
 		LsDir(&oraAllInOne);
 		break;
 	case ACTION_LS:
-		Ls(&oraAllInOne, argv[3]);
+		Ls(&oraAllInOne, vDirectory, sqlLs);
 		break;
 	case ACTION_READ:
 	case ACTION_WRITE:
-		TransferFile(&oraAllInOne, programAction == ACTION_READ, vDirectory, vRemoteFile, vLocalFile);
+		TransferFile(&oraAllInOne, programOptions.programAction == ACTION_READ, vDirectory, vRemoteFile, vLocalFile);
 		break;
+	default:
+		/* TODO: remove when everything is implemented */
+		ExitWithError(&oraAllInOne, 5, ERROR_NONE, "Not implemented yet\n");
 	}
 
 	ExitWithError(&oraAllInOne, 0, ERROR_NONE, 0);

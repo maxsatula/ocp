@@ -135,13 +135,6 @@ void ExitWithError(struct ORACLEALLINONE *oraAllInOne, int exitCode, enum ERROR_
 	case ERROR_OS:
 		fprintf(stderr, "%s", strerror(errno));
 		break;
-	case ERROR_USAGE:
-		fprintf(stderr, "Usage:\n\
-   ocp username/password@connect_identifier DIRECTORY:remotefile localfile\n\
-   ocp username/password@connect_identifier localfile DIRECTORY:remotefile\n\
-   ocp username/password@connect_identifier -lsdir\n\
-   ocp username/password@connect_identifier -ls DIRECTORY\n");
-		break;
 	}
 
 	if (oraAllInOne->currentStmt)
