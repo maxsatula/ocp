@@ -363,6 +363,129 @@ end;",
 	ReleaseStmt(oraAllInOne);
 }
 
+void Compress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compressionLevel,
+              char* pOriginalFileName, char* pCompressedFileName)
+{
+	ub4 vCompressionLevel;
+
+	struct BINDVARIABLE oraBindsCompress[] =
+	{
+		{ 0, SQLT_STR, ":directory",           pDirectory,          ORA_IDENTIFIER_SIZE + 1   },
+		{ 0, SQLT_INT, ":compression_level",   &vCompressionLevel,  sizeof(vCompressionLevel) },
+		{ 0, SQLT_STR, ":original_filename"  , pOriginalFileName,   MAX_FMT_SIZE              },
+		{ 0, SQLT_STR, ":compressed_filename", pCompressedFileName, MAX_FMT_SIZE              }
+	};
+
+	struct ORACLESTATEMENT oraStmtCompress = { "\
+DECLARE\
+	f_handle UTL_FILE.FILE_TYPE;\
+	c_handle BINARY_INTEGER;\
+	raw_buffer RAW(32767);\
+	blob_buffer BLOB;\
+	actual_size NUMBER;\
+	pos BINARY_INTEGER;\
+	blobsize BINARY_INTEGER; \
+BEGIN\
+	f_handle := UTL_FILE.FOPEN(:directory, :original_filename, 'rb');\
+	DBMS_LOB.CREATETEMPORARY(blob_buffer, TRUE, DBMS_LOB.CALL);\
+	IF :compression_level > 0 THEN\
+		c_handle := UTL_COMPRESS.LZ_COMPRESS_OPEN(blob_buffer, :compression_level);\
+	ELSE\
+		c_handle := UTL_COMPRESS.LZ_COMPRESS_OPEN(blob_buffer);\
+	END IF;\
+	LOOP\
+		BEGIN\
+			UTL_FILE.GET_RAW(f_handle, raw_buffer, 16384);\
+			UTL_COMPRESS.LZ_COMPRESS_ADD(c_handle, blob_buffer, raw_buffer);\
+		EXCEPTION\
+			WHEN NO_DATA_FOUND THEN\
+				EXIT;\
+		END;\
+	END LOOP;\
+	UTL_COMPRESS.LZ_COMPRESS_CLOSE(c_handle, blob_buffer);\
+	UTL_FILE.FCLOSE(f_handle);\
+\
+	f_handle := UTL_FILE.FOPEN(:directory, :compressed_filename, 'wb');\
+	pos := 0;\
+	blobsize := DBMS_LOB.GETLENGTH(blob_buffer);\
+	WHILE pos < blobsize LOOP\
+		actual_size := LEAST(blobsize - pos, 16384);\
+		DBMS_LOB.READ(blob_buffer, actual_size, pos + 1, raw_buffer);\
+		UTL_FILE.PUT_RAW(f_handle, raw_buffer);\
+		pos := pos + actual_size;\
+	END LOOP;\
+	DBMS_LOB.FREETEMPORARY(blob_buffer);\
+	UTL_FILE.FCLOSE(f_handle);\
+END;\
+",
+	       0, oraBindsCompress, sizeof(oraBindsCompress)/sizeof(struct BINDVARIABLE), 0, 0 };
+
+	vCompressionLevel = compressionLevel;
+
+	PrepareStmtAndBind(oraAllInOne, &oraStmtCompress);
+
+	if (ExecuteStmt(oraAllInOne))
+		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to compress file in oracle directory\n");
+
+	ReleaseStmt(oraAllInOne);	
+}
+
+void Uncompress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory,
+                char* pOriginalFileName, char* pUncompressedFileName)
+{
+	struct BINDVARIABLE oraBindsUncompress[] =
+	{
+		{ 0, SQLT_STR, ":directory",             pDirectory,            ORA_IDENTIFIER_SIZE + 1 },
+		{ 0, SQLT_STR, ":original_filename"  ,   pOriginalFileName,     MAX_FMT_SIZE            },
+		{ 0, SQLT_STR, ":uncompressed_filename", pUncompressedFileName, MAX_FMT_SIZE            }
+	};
+
+	struct ORACLESTATEMENT oraStmtUncompress = { "\
+DECLARE\
+	f_handle UTL_FILE.FILE_TYPE;\
+	c_handle BINARY_INTEGER;\
+	raw_buffer RAW(32767);\
+	blob_buffer BLOB; \
+BEGIN\
+	DBMS_LOB.CREATETEMPORARY(blob_buffer, TRUE, DBMS_LOB.CALL);\
+	f_handle := UTL_FILE.FOPEN(:directory, :original_filename, 'rb');\
+	LOOP\
+		BEGIN\
+			UTL_FILE.GET_RAW(f_handle, raw_buffer, 16384);\
+			DBMS_LOB.WRITEAPPEND(blob_buffer, UTL_RAW.LENGTH(raw_buffer), raw_buffer);\
+		EXCEPTION\
+			WHEN NO_DATA_FOUND THEN\
+				EXIT;\
+		END;\
+	END LOOP;\
+	UTL_FILE.FCLOSE(f_handle);\
+\
+	c_handle := UTL_COMPRESS.LZ_UNCOMPRESS_OPEN(blob_buffer);\
+	f_handle := UTL_FILE.FOPEN(:directory, :uncompressed_filename, 'wb');\
+	LOOP\
+		BEGIN\
+			UTL_COMPRESS.LZ_UNCOMPRESS_EXTRACT(c_handle, raw_buffer);\
+			UTL_FILE.PUT_RAW(f_handle, raw_buffer);\
+		EXCEPTION\
+			WHEN NO_DATA_FOUND THEN\
+				EXIT;\
+		END;\
+	END LOOP;\
+	UTL_FILE.FCLOSE(f_handle);\
+	UTL_COMPRESS.LZ_UNCOMPRESS_CLOSE(c_handle);\
+	DBMS_LOB.FREETEMPORARY(blob_buffer);\
+END;\
+",
+	       0, oraBindsUncompress, sizeof(oraBindsUncompress)/sizeof(struct BINDVARIABLE), 0, 0 };
+
+	PrepareStmtAndBind(oraAllInOne, &oraStmtUncompress);
+
+	if (ExecuteStmt(oraAllInOne))
+		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to uncompress file in oracle directory\n");
+
+	ReleaseStmt(oraAllInOne);	
+}
+
 struct PROGRAM_OPTIONS
 {
 	enum PROGRAM_ACTION programAction;
@@ -617,7 +740,7 @@ SELECT t.file_name,\
 		printf("Copying %s Oracle. Local file %s, remote file %s, directory %s\n",
 			   programOptions.programAction == ACTION_READ ? "FROM" : "TO", vLocalFile, vRemoteFile, vDirectory);
 		if (programOptions.compressionLevel)
-			printf("On-the-fly compression is on, method %d...\n", programOptions.compressionLevel);
+			printf("On-the-fly compression is on, level %d...\n", programOptions.compressionLevel);
 #endif
 		break;
 #ifdef DEBUG
@@ -674,14 +797,28 @@ SELECT t.file_name,\
 		break;
 	case ACTION_GZIP:
 		SplitToDirectoryAndFileName(&poptcon, vDirectory, vRemoteFile);
+		if (strlen(vRemoteFile) + 3 >= MAX_FMT_SIZE)
+		{
+			fprintf(stderr, "Compressed file name is too long\n");
+			ExitWithUsage(&poptcon);
+		}
+		strcpy(vLocalFile, vRemoteFile);
+		strcat(vLocalFile, ".gz");
 #ifdef DEBUG
-		printf("Compressing file, compression method %d%s...\n",
+		printf("Compressing file, compression level %d%s...\n",
 			programOptions.compressionLevel,
 			programOptions.isBackground ? ", in background" : "");
 #endif
 		break;
 	case ACTION_GUNZIP:
 		SplitToDirectoryAndFileName(&poptcon, vDirectory, vRemoteFile);
+		if (strlen(vRemoteFile) < 4 || strcmp(".gz", vRemoteFile + strlen(vRemoteFile) - 3))
+		{
+			fprintf(stderr, "Compressed file name does not end with .gz\n");
+			ExitWithUsage(&poptcon);
+		}
+		strcpy(vLocalFile, vRemoteFile);
+		vLocalFile[strlen(vRemoteFile) - 3] = '\0';
 #ifdef DEBUG
 		printf("Decompressing file%s...\n",
 			programOptions.isBackground ? ", in background" : "");
@@ -721,6 +858,12 @@ SELECT t.file_name,\
 		break;
 	case ACTION_RM:
 		Rm(&oraAllInOne, vDirectory, vRemoteFile);
+		break;
+	case ACTION_GZIP:
+		Compress(&oraAllInOne, vDirectory, programOptions.compressionLevel, vRemoteFile, vLocalFile);
+		break;
+	case ACTION_GUNZIP:
+		Uncompress(&oraAllInOne, vDirectory, vRemoteFile, vLocalFile);
 		break;
 	default:
 		/* TODO: remove when everything is implemented */
