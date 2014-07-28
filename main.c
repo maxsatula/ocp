@@ -30,7 +30,8 @@ Hence no physical or file system access required to a database server.
 #include <oci.h>
 #include "oracle.h"
 
-#define ORA_RAW_BUFFER_SIZE 0x2000
+#define ORA_RAW_BUFFER_SIZE 0x4000
+#define ORA_IDENTIFIER_SIZE 30
 
 enum PROGRAM_ACTION { ACTION_READ, ACTION_WRITE, ACTION_LSDIR, ACTION_LS, ACTION_RM,
 	ACTION_GZIP, ACTION_GUNZIP, ACTION_INSTALL, ACTION_DEINSTALL };
@@ -38,7 +39,7 @@ enum PROGRAM_ACTION { ACTION_READ, ACTION_WRITE, ACTION_LSDIR, ACTION_LS, ACTION
 void LsDir(struct ORACLEALLINONE *oraAllInOne)
 {
 	sword ociResult;
-	char vDirectory[31];
+	char vDirectory[ORA_IDENTIFIER_SIZE + 1];
 	char vDirectoryPath[MAX_FMT_SIZE];
 	char vGrantable1[MAX_FMT_SIZE];
 	char vGrantable2[MAX_FMT_SIZE];
@@ -98,7 +99,6 @@ SELECT d.directory_name,\
 void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 {
 	sword ociResult;
-	char vDirectory[31];
 	char vFileName[MAX_FMT_SIZE];
 	ub8 vBytes;
 	char vLastModified[7];
@@ -107,7 +107,7 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 
 	struct BINDVARIABLE oraBindsLs[] =
 	{
-		{ 0, SQLT_STR, ":directory", vDirectory, sizeof(vDirectory)-1 }
+		{ 0, SQLT_STR, ":directory", pDirectory, ORA_IDENTIFIER_SIZE + 1 }
 	};
 
 	struct ORACLEDEFINE oraDefinesLs[] =
@@ -122,10 +122,6 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 	       0, oraBindsLs, sizeof(oraBindsLs)/sizeof(struct BINDVARIABLE),
 	       oraDefinesLs, sizeof(oraDefinesLs)/sizeof(struct ORACLEDEFINE) };
 
-	strncpy(vDirectory, pDirectory, sizeof(vDirectory));
-	if (vDirectory[sizeof(vDirectory) - 1])
-		ExitWithError(oraAllInOne, 1, ERROR_NONE, "Oracle directory name is too long\n");
-
 	PrepareStmtAndBind(oraAllInOne, &oraStmtLs);
 
 	if (ExecuteStmt(oraAllInOne))
@@ -134,7 +130,7 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 	printf("Contents of %s directory\n\
 %-40s %-12s %s\n\
 ---------------------------------------- ------------ -------------------\n",
-	       vDirectory, "File Name", "    Size", "Last Modified");
+	       pDirectory, "File Name", "    Size", "Last Modified");
 
 	i = 0;
 	totalBytes = 0;
@@ -166,6 +162,26 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 	ReleaseStmt(oraAllInOne);	
 }
 
+void Rm(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, char* pFileName)
+{
+	struct BINDVARIABLE oraBindsRm[] =
+	{
+		{ 0, SQLT_STR, ":directory", pDirectory, ORA_IDENTIFIER_SIZE + 1 },
+		{ 0, SQLT_STR, ":filename",  pFileName,  MAX_FMT_SIZE }
+	};
+
+	struct ORACLESTATEMENT oraStmtRm = {
+	       "BEGIN utl_file.fremove(:directory, :filename); END;",
+	       0, oraBindsRm, sizeof(oraBindsRm)/sizeof(struct BINDVARIABLE), 0, 0 };
+
+	PrepareStmtAndBind(oraAllInOne, &oraStmtRm);
+
+	if (ExecuteStmt(oraAllInOne))
+		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to remove file in oracle directory\n");
+
+	ReleaseStmt(oraAllInOne);	
+}
+
 void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
                   char* pDirectory, char* pRemoteFile, char* pLocalFile)
 {
@@ -189,8 +205,8 @@ void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
 
 	struct BINDVARIABLE bindVariablesOpen[] =
 	{
-		{ 0, SQLT_STR, ":directory", pDirectory,  strlen(pDirectory)  + 1 }, /* cannot do sizeof() */
-		{ 0, SQLT_STR, ":filename",  pRemoteFile, strlen(pRemoteFile) + 1 }, /* cannot do sizeof() */
+		{ 0, SQLT_STR, ":directory", pDirectory,  ORA_IDENTIFIER_SIZE + 1 },
+		{ 0, SQLT_STR, ":filename",  pRemoteFile, MAX_FMT_SIZE            },
 		{ 0, SQLT_STR, ":openmode",  vOpenMode,   sizeof(vOpenMode)       },
 		{ 0, SQLT_INT, ":fhandle1",  &vFHandle1,  sizeof(vFHandle1)       },
 		{ 0, SQLT_INT, ":fhandle2",  &vFHandle2,  sizeof(vFHandle2)       }
@@ -382,7 +398,7 @@ void SplitToDirectoryAndFileName(poptContext *poptcon, char* pDirectory, char* p
 		ExitWithUsage(poptcon);
 	}
 
-	if (fileNamePtr - remoteArg >= 31)
+	if (fileNamePtr - remoteArg > ORA_IDENTIFIER_SIZE)
 	{
 		fprintf(stderr, "Oracle Directory name is too long\n");
 		ExitWithUsage(poptcon);
@@ -402,7 +418,7 @@ int main(int argc, const char *argv[])
 {
 	char connectionString[MAX_FMT_SIZE];
 	char *pwdptr, *dbconptr;
-	char vDirectory[31];
+	char vDirectory[ORA_IDENTIFIER_SIZE + 1];
 	char vLocalFile[MAX_FMT_SIZE];
 	char vRemoteFile[MAX_FMT_SIZE];
 	const char* fileNamePtr;
@@ -693,15 +709,18 @@ SELECT t.file_name,\
 
 	switch (programOptions.programAction)
 	{
+	case ACTION_READ:
+	case ACTION_WRITE:
+		TransferFile(&oraAllInOne, programOptions.programAction == ACTION_READ, vDirectory, vRemoteFile, vLocalFile);
+		break;
 	case ACTION_LSDIR:
 		LsDir(&oraAllInOne);
 		break;
 	case ACTION_LS:
 		Ls(&oraAllInOne, vDirectory, sqlLs);
 		break;
-	case ACTION_READ:
-	case ACTION_WRITE:
-		TransferFile(&oraAllInOne, programOptions.programAction == ACTION_READ, vDirectory, vRemoteFile, vLocalFile);
+	case ACTION_RM:
+		Rm(&oraAllInOne, vDirectory, vRemoteFile);
 		break;
 	default:
 		/* TODO: remove when everything is implemented */
