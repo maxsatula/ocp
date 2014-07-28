@@ -192,6 +192,7 @@ void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
 	ub4 vActualSize;
 	ub4 vFHandle1;
 	ub4 vFHandle2;
+	int isWorkaroundApplied;
 
 	OCIBind *ociBind;
 
@@ -300,6 +301,7 @@ end;",
 
 	if (readingDirection)
 	{
+		isWorkaroundApplied = 0;
 		do
 		{
 			vSize = sizeof(vBuffer);
@@ -318,6 +320,54 @@ end;",
 					fclose(fp);
 					/* TODO: remove partially downloaded file */
 					ExitWithError(oraAllInOne, 4, ERROR_OS, "Error writing to a local file\n");
+				}
+				if (!isWorkaroundApplied && vSize == sizeof(vBuffer))
+				{
+					/* Possible Oracle Bug avoidance:
+					Second read by UTL_FILE.GET_RAW looses one byte
+					The workaround is to close the file, reopen it
+					(SEEK is not supported for files open in binary mode),
+					and read 1 byte less than buffer size go have a good
+					file position for further reads
+					This happens only once, between first and second read
+					*/
+
+					ReleaseStmt(oraAllInOne);
+
+					PrepareStmtAndBind(oraAllInOne, &oraStmtClose);
+					if (ExecuteStmt(oraAllInOne))
+					{
+						fclose(fp);
+						/* TODO: remove partially downloaded file */
+						ExitWithError(oraAllInOne, 4, ERROR_OCI, "Error closing an Oracle remote file\n");
+					}
+					ReleaseStmt(oraAllInOne);
+
+					PrepareStmtAndBind(oraAllInOne, &oraStmtOpen);
+					if (ExecuteStmt(oraAllInOne))
+					{
+						fclose(fp);
+						/* TODO: remove partially downloaded file */
+						ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to open an Oracle remote file for reading\n");
+					}
+					ReleaseStmt(oraAllInOne);
+
+					PrepareStmtAndBind(oraAllInOne, &oraStmtRead);
+					vSize = sizeof(vBuffer) - 1;
+					if (ExecuteStmt(oraAllInOne))
+					{
+						fclose(fp);
+						/* TODO: remove partially downloaded file */
+						ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed execution of %s\n",
+									  oraAllInOne->currentStmt->sql);
+					}
+					if (vSize != sizeof(vBuffer) - 1)
+					{
+						fclose(fp);
+						/* TODO: remove partially downloaded file */
+						ExitWithError(oraAllInOne, 3, ERROR_NONE, "Not enough bytes received from Oracle remote file\n");
+					}
+					isWorkaroundApplied = 1;
 				}
 			}
 		}
