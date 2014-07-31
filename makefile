@@ -11,7 +11,7 @@ ifeq ($(UNAME_S),AIX)
 endif
 
 ocp: main.o oracle.o
-	cc $(CCFLAGS) $(LIBFLAGS) -L$$ORACLE_HOME/lib -lclntsh -lpopt oracle.o main.o -oocp
+	cc $(CCFLAGS) $(LIBFLAGS) -L$$ORACLE_HOME/lib -lclntsh -lpopt -lz oracle.o main.o -oocp
 
 main.o: main.c oracle.h
 	cc $(CCFLAGS) $(INCLUDEFLAGS) -I$$ORACLE_HOME/rdbms/public -c main.c

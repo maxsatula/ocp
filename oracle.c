@@ -140,6 +140,12 @@ void ExitWithError(struct ORACLEALLINONE *oraAllInOne, int exitCode, enum ERROR_
 	if (oraAllInOne->currentStmt)
 		ReleaseStmt(oraAllInOne);
 
+	if (oraAllInOne->blob)
+	{
+		OCIDescriptorFree(oraAllInOne->blob, OCI_DTYPE_LOB);
+		oraAllInOne->blob = 0;
+	}
+
 	if (oraAllInOne->srvhp)
 	{
 		if (oraAllInOne->svchp)

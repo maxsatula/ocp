@@ -62,6 +62,7 @@ struct ORACLEALLINONE
 	OCIServer *srvhp;
 	OCISession *usrhp;
 	struct ORACLESTATEMENT *currentStmt;
+	OCILobLocator *blob;
 };
 
 void PrepareStmtAndBind(struct ORACLEALLINONE *oraAllInOne, struct ORACLESTATEMENT *oracleStatement);

@@ -20,17 +20,19 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 This is an Oracle Copy command line tool for downloading and uploading files
 from/to Oracle Database directories (e.g. DATA_PUMP_DIR) using Oracle SQL Net
 connection only.
-Hence no physical or file system access required to a database server. 
+Hence no physical or file system access required to a database server.
 
 *****************************************************************************/
 
 #include <stdio.h>
 #include <string.h>
 #include <popt.h>
+#include <zlib.h>
 #include <oci.h>
 #include "oracle.h"
 
 #define ORA_RAW_BUFFER_SIZE 0x4000
+#define ORA_BLOB_BUFFER_SIZE 0x10000
 #define ORA_IDENTIFIER_SIZE 30
 
 enum PROGRAM_ACTION { ACTION_READ, ACTION_WRITE, ACTION_LSDIR, ACTION_LS, ACTION_RM,
@@ -486,6 +488,281 @@ END;\
 	ReleaseStmt(oraAllInOne);	
 }
 
+void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compressionLevel, char* pRemoteFile, char* pLocalFile)
+{
+	FILE *fp;
+	sword result;
+	ub4 vCompressionLevel;
+	char blobBuffer[ORA_BLOB_BUFFER_SIZE];
+	oraub8 vSize;
+    int zRet;
+    z_stream zStrm;
+    unsigned char zOut[ORA_BLOB_BUFFER_SIZE];
+
+	struct BINDVARIABLE oraBindsDownload[] =
+	{
+		{ 0, SQLT_STR,  ":directory",         pDirectory,         ORA_IDENTIFIER_SIZE + 1   },
+		{ 0, SQLT_INT,  ":compression_level", &vCompressionLevel, sizeof(vCompressionLevel) },
+		{ 0, SQLT_STR,  ":filename",          pRemoteFile,        MAX_FMT_SIZE              },
+		{ 0, SQLT_BLOB, ":blob",              &oraAllInOne->blob, sizeof(oraAllInOne->blob) }
+	};
+
+	struct ORACLESTATEMENT oraStmtDownload = { "\
+DECLARE\
+	f_handle UTL_FILE.FILE_TYPE;\
+	c_handle BINARY_INTEGER;\
+	raw_buffer RAW(32767);\
+BEGIN\
+	f_handle := UTL_FILE.FOPEN(:directory, :filename, 'rb');\
+	DBMS_LOB.CREATETEMPORARY(:blob, TRUE, DBMS_LOB.CALL);\
+	IF :compression_level > 0 THEN\
+		c_handle := UTL_COMPRESS.LZ_COMPRESS_OPEN(:blob, :compression_level);\
+	ELSE\
+		c_handle := UTL_COMPRESS.LZ_COMPRESS_OPEN(:blob);\
+	END IF;\
+	LOOP\
+		BEGIN\
+			UTL_FILE.GET_RAW(f_handle, raw_buffer, 16384);\
+			UTL_COMPRESS.LZ_COMPRESS_ADD(c_handle, :blob, raw_buffer);\
+		EXCEPTION\
+			WHEN NO_DATA_FOUND THEN\
+				EXIT;\
+		END;\
+	END LOOP;\
+	UTL_COMPRESS.LZ_COMPRESS_CLOSE(c_handle, :blob);\
+	UTL_FILE.FCLOSE(f_handle);\
+END;\
+",
+	       0, oraBindsDownload, sizeof(oraBindsDownload)/sizeof(struct BINDVARIABLE), 0, 0 };
+
+	vCompressionLevel = compressionLevel;
+
+	if (OCIDescriptorAlloc(oraAllInOne->envhp, (void**)&oraAllInOne->blob, OCI_DTYPE_LOB, 0, 0))
+	{
+		ExitWithError(oraAllInOne, 4, ERROR_NONE, "Failed to allocate BLOB\n");
+	}
+
+	PrepareStmtAndBind(oraAllInOne, &oraStmtDownload);
+
+	if (ExecuteStmt(oraAllInOne))
+		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to compress file in oracle directory\n");
+
+	if ((fp = fopen(pLocalFile, "wb")) == NULL)
+	{
+		ExitWithError(oraAllInOne, 4, ERROR_OS, "Error opening a local file for writing\n");
+	}
+
+	zStrm.zalloc = Z_NULL;
+    zStrm.zfree = Z_NULL;
+    zStrm.opaque = Z_NULL;
+    zStrm.avail_in = 0;
+    zStrm.next_in = Z_NULL;
+	zRet = inflateInit2(&zStrm, 16+MAX_WBITS);
+	if (zRet != Z_OK)
+	{
+		fclose(fp);
+		ExitWithError(oraAllInOne, 5, ERROR_NONE, "ZLIB initialization failed\n");
+	}
+
+	vSize = 0;
+	result = OCILobRead2(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob, &vSize, 0, 1, blobBuffer, ORA_BLOB_BUFFER_SIZE, OCI_FIRST_PIECE, 0, 0, 0, 0);
+	while (result == OCI_NEED_DATA || result == OCI_SUCCESS)
+	{
+		zStrm.avail_in = vSize;
+		zStrm.next_in = blobBuffer;
+		do
+		{
+			zStrm.avail_out = ORA_BLOB_BUFFER_SIZE;
+			zStrm.next_out = zOut;
+			zRet = inflate(&zStrm, Z_NO_FLUSH);
+			switch (zRet)
+			{
+            case Z_STREAM_ERROR:
+			case Z_NEED_DICT:
+			case Z_DATA_ERROR:
+			case Z_MEM_ERROR:
+				(void)inflateEnd(&zStrm);
+				fclose(fp);
+				ExitWithError(oraAllInOne, 5, ERROR_NONE, "ZLIB inflate failed: %d, size %d\n", zRet, vSize);
+			}
+
+			fwrite(zOut, sizeof(unsigned char), ORA_BLOB_BUFFER_SIZE - zStrm.avail_out, fp);
+			if (ferror(fp))
+			{
+				(void)inflateEnd(&zStrm);
+				fclose(fp);
+				/* TODO: remove partially downloaded file */
+				ExitWithError(oraAllInOne, 4, ERROR_OS, "Error writing to a local file\n");
+			}
+		}
+		while (zStrm.avail_out == 0);
+
+		if (result == OCI_SUCCESS)
+			break;
+		result = OCILobRead2(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob, &vSize, 0, 1, blobBuffer, ORA_BLOB_BUFFER_SIZE, OCI_NEXT_PIECE, 0, 0, 0, 0);
+	}
+	inflateEnd(&zStrm);
+	fclose(fp);
+
+	if (result != OCI_SUCCESS)
+	{
+		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Error reading BLOB\n");
+	}
+
+	ReleaseStmt(oraAllInOne);
+
+	OCILobFreeTemporary(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob);
+
+	if (OCIDescriptorFree(oraAllInOne->blob, OCI_DTYPE_LOB))
+	{
+		ExitWithError(oraAllInOne, 4, ERROR_NONE, "Failed to free BLOB\n");
+	}
+	oraAllInOne->blob = 0;
+}
+
+void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compressionLevel, char* pRemoteFile, char* pLocalFile)
+{
+	FILE *fp;
+	sword result;
+	char blobBuffer[ORA_BLOB_BUFFER_SIZE];
+	oraub8 vSize;
+	ub1 piece;
+    int zRet, zFlush;
+    z_stream zStrm;
+    unsigned char zIn[ORA_BLOB_BUFFER_SIZE];
+
+	struct BINDVARIABLE oraBindsUpload[] =
+	{
+		{ 0, SQLT_STR,  ":directory",         pDirectory,         ORA_IDENTIFIER_SIZE + 1   },
+		{ 0, SQLT_STR,  ":filename",          pRemoteFile,        MAX_FMT_SIZE              },
+		{ 0, SQLT_BLOB, ":blob",              &oraAllInOne->blob, sizeof(oraAllInOne->blob) }
+	};
+
+	struct ORACLESTATEMENT oraStmtUpload = { "\
+DECLARE\
+	f_handle UTL_FILE.FILE_TYPE;\
+	c_handle BINARY_INTEGER;\
+	raw_buffer RAW(32767);\
+BEGIN\
+	c_handle := UTL_COMPRESS.LZ_UNCOMPRESS_OPEN(:blob);\
+	f_handle := UTL_FILE.FOPEN(:directory, :filename, 'wb');\
+	LOOP\
+		BEGIN\
+			UTL_COMPRESS.LZ_UNCOMPRESS_EXTRACT(c_handle, raw_buffer);\
+			UTL_FILE.PUT_RAW(f_handle, raw_buffer);\
+		EXCEPTION\
+			WHEN NO_DATA_FOUND THEN\
+				EXIT;\
+		END;\
+	END LOOP;\
+	UTL_FILE.FCLOSE(f_handle);\
+	UTL_COMPRESS.LZ_UNCOMPRESS_CLOSE(c_handle);\
+END;\
+",
+	       0, oraBindsUpload, sizeof(oraBindsUpload)/sizeof(struct BINDVARIABLE), 0, 0 };
+
+	if (OCIDescriptorAlloc(oraAllInOne->envhp, (void**)&oraAllInOne->blob, OCI_DTYPE_LOB, 0, 0))
+	{
+		ExitWithError(oraAllInOne, 4, ERROR_NONE, "Failed to allocate BLOB\n");
+	}
+
+	if (OCILobCreateTemporary(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob, OCI_DEFAULT, 0, OCI_TEMP_BLOB, TRUE/*cache*/, OCI_DURATION_SESSION))
+	{
+		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to create temporary BLOB\n");
+	}
+	/*if (OCILobOpen(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob, OCI_LOB_READWRITE))
+	{
+		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to open temporary BLOB for write\n");
+	}*/
+	piece = OCI_FIRST_PIECE;
+
+	if ((fp = fopen(pLocalFile, "rb")) == NULL)
+	{
+		ExitWithError(oraAllInOne, 4, ERROR_OS, "Error opening a local file for reading\n");
+	}
+
+	zStrm.zalloc = Z_NULL;
+    zStrm.zfree = Z_NULL;
+    zStrm.opaque = Z_NULL;
+
+	zRet = deflateInit2(&zStrm, compressionLevel ? compressionLevel : Z_DEFAULT_COMPRESSION, Z_DEFLATED, 16+MAX_WBITS, 8, Z_DEFAULT_STRATEGY);
+	if (zRet != Z_OK)
+	{
+		fclose(fp);
+		ExitWithError(oraAllInOne, 5, ERROR_NONE, "ZLIB initialization failed\n");
+	}
+
+	while (zStrm.avail_in = fread(zIn, sizeof(unsigned char), sizeof(zIn), fp))
+	{
+		if (ferror(fp))
+		{
+			(void)deflateEnd(&zStrm);
+			fclose(fp);
+			ExitWithError(oraAllInOne, 4, ERROR_OS, "Error reading from a local file\n");
+		}
+
+		zFlush = feof(fp) ? Z_FINISH : Z_NO_FLUSH;
+		zStrm.next_in = zIn;
+
+		do
+		{
+			zStrm.avail_out = ORA_BLOB_BUFFER_SIZE;
+			zStrm.next_out = blobBuffer;
+			zRet = deflate(&zStrm, zFlush);
+			if (zRet != Z_OK && zRet != Z_STREAM_END && zRet != Z_BUF_ERROR)
+			{
+				(void)deflateEnd(&zStrm);
+				fclose(fp);
+				ExitWithError(oraAllInOne, 5, ERROR_NONE, "ZLIB deflate failed: %d, size %d\n", zRet, zStrm.avail_in);
+			}
+
+			if (zRet == Z_STREAM_END)
+				piece = OCI_LAST_PIECE;
+			vSize = 0;
+			if (zStrm.avail_out == ORA_BLOB_BUFFER_SIZE)
+				continue;
+			result = OCILobWrite2(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob, &vSize, 0, 1, blobBuffer, ORA_BLOB_BUFFER_SIZE - zStrm.avail_out, piece, 0, 0, 0, 0);
+			if (result != OCI_NEED_DATA && result)
+			{
+				(void)deflateEnd(&zStrm);
+				fclose(fp);
+				/* TODO: remove partially downloaded file */
+				ExitWithError(oraAllInOne, 4, ERROR_OCI, "Error writing to BLOB\n");
+			}
+			piece = OCI_NEXT_PIECE;
+		}
+		while (zStrm.avail_out == 0);
+	}
+
+	deflateEnd(&zStrm);
+	fclose(fp);
+
+	/*vSize = 0;
+	if (OCILobWrite2(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob, &vSize, 0, 1, blobBuffer, 0, OCI_LAST_PIECE, 0, 0, 0, 0))
+	{
+		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Error writing last piece to BLOB\n");
+	}
+	if (OCILobClose(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob))
+	{
+		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to close temporary BLOB\n");
+	}*/
+
+	PrepareStmtAndBind(oraAllInOne, &oraStmtUpload);
+
+	if (ExecuteStmt(oraAllInOne))
+		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to decompress file in oracle directory\n");
+
+	ReleaseStmt(oraAllInOne);
+
+	OCILobFreeTemporary(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob);
+
+	if (OCIDescriptorFree(oraAllInOne->blob, OCI_DTYPE_LOB))
+	{
+		ExitWithError(oraAllInOne, 4, ERROR_NONE, "Failed to free BLOB\n");
+	}
+	oraAllInOne->blob = 0;
+}
+
 struct PROGRAM_OPTIONS
 {
 	enum PROGRAM_ACTION programAction;
@@ -847,8 +1124,16 @@ SELECT t.file_name,\
 	switch (programOptions.programAction)
 	{
 	case ACTION_READ:
+		if (programOptions.compressionLevel > 0)
+			DownloadFileWithCompression(&oraAllInOne, vDirectory, programOptions.compressionLevel, vRemoteFile, vLocalFile);
+		else
+			TransferFile(&oraAllInOne, 1, vDirectory, vRemoteFile, vLocalFile);
+		break;
 	case ACTION_WRITE:
-		TransferFile(&oraAllInOne, programOptions.programAction == ACTION_READ, vDirectory, vRemoteFile, vLocalFile);
+		if (programOptions.compressionLevel > 0)
+			UploadFileWithCompression(&oraAllInOne, vDirectory, programOptions.compressionLevel, vRemoteFile, vLocalFile);
+		else
+			TransferFile(&oraAllInOne, 0, vDirectory, vRemoteFile, vLocalFile);
 		break;
 	case ACTION_LSDIR:
 		LsDir(&oraAllInOne);
