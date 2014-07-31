@@ -30,6 +30,7 @@ Hence no physical or file system access required to a database server.
 #include <zlib.h>
 #include <oci.h>
 #include "oracle.h"
+#include "progressmeter.h"
 
 #define ORA_RAW_BUFFER_SIZE 0x4000
 #define ORA_BLOB_BUFFER_SIZE 0x10000
@@ -194,6 +195,10 @@ void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
 	ub4 vActualSize;
 	ub4 vFHandle1;
 	ub4 vFHandle2;
+	int showProgress;
+	off_t cnt;
+	off_t sourceSize;
+	struct stat fileStat;
 
 	OCIBind *ociBind;
 
@@ -239,6 +244,22 @@ begin \
   utl_file.fclose(handle); \
 end;",
 	       0, bindVariablesClose, sizeof(bindVariablesClose)/sizeof(struct BINDVARIABLE), 0, 0 };
+
+	struct BINDVARIABLE bindVariablesFsize[] =
+	{
+		{ 0, SQLT_STR, ":directory", pDirectory,  ORA_IDENTIFIER_SIZE + 1 },
+		{ 0, SQLT_STR, ":filename",  pRemoteFile, MAX_FMT_SIZE            },
+		{ 0, SQLT_INT, ":length",    &sourceSize, sizeof(sourceSize)      }
+	};
+
+	struct ORACLESTATEMENT oraStmtFsize = { "\
+declare \
+  exists_ BOOLEAN;\
+  blocksize_ NUMBER; \
+begin \
+  utl_file.fgetattr(:directory, :filename, exists_, :length, blocksize_); \
+end;",
+	       0, bindVariablesFsize, sizeof(bindVariablesFsize)/sizeof(struct BINDVARIABLE), 0, 0 };
 
 	struct BINDVARIABLE bindVariablesRead[] =
 	{
@@ -290,6 +311,28 @@ end;",
 
 	ReleaseStmt(oraAllInOne);
 
+	showProgress = 1;
+	if (!isatty(STDOUT_FILENO))
+		showProgress = 0;
+	cnt = 0;
+	if (showProgress)
+	{
+		if (readingDirection)
+		{
+			PrepareStmtAndBind(oraAllInOne, &oraStmtFsize);
+			if (ExecuteStmt(oraAllInOne))
+				ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to obtain Oracle remote file size\n");
+			ReleaseStmt(oraAllInOne);
+		}
+		else
+		{
+			stat(pLocalFile, &fileStat);
+			sourceSize = fileStat.st_size;
+		}
+
+		start_progress_meter(readingDirection ? pRemoteFile : pLocalFile, sourceSize, &cnt);
+	}
+
 	PrepareStmtAndBind(oraAllInOne, readingDirection ? &oraStmtRead : &oraStmtWrite);
 
 	if ((fp = fopen(pLocalFile, readingDirection ? "wb" : "rb")) == NULL)
@@ -321,6 +364,7 @@ end;",
 					/* TODO: remove partially downloaded file */
 					ExitWithError(oraAllInOne, 4, ERROR_OS, "Error writing to a local file\n");
 				}
+				cnt += vSize;
 			}
 		}
 		while (vSize);
@@ -351,9 +395,12 @@ end;",
 							  oraAllInOne->currentStmt->sql);
 			}
 			OCIHandleFree(ociBind, OCI_HTYPE_BIND);
+			cnt += vActualSize;
 		}
 	}
 
+	if (showProgress)
+		stop_progress_meter();
 	fclose(fp);
 	ReleaseStmt(oraAllInOne);
 
@@ -495,9 +542,12 @@ void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDire
 	ub4 vCompressionLevel;
 	char blobBuffer[ORA_BLOB_BUFFER_SIZE];
 	oraub8 vSize;
-    int zRet;
-    z_stream zStrm;
-    unsigned char zOut[ORA_BLOB_BUFFER_SIZE];
+	int zRet;
+	z_stream zStrm;
+	unsigned char zOut[ORA_BLOB_BUFFER_SIZE];
+	int showProgress;
+	off_t cnt;
+	off_t sourceSize;
 
 	struct BINDVARIABLE oraBindsDownload[] =
 	{
@@ -547,6 +597,17 @@ END;\
 	if (ExecuteStmt(oraAllInOne))
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to compress file in oracle directory\n");
 
+	showProgress = 1;
+	if (!isatty(STDOUT_FILENO))
+		showProgress = 0;
+	cnt = 0;
+	if (showProgress)
+	{
+		if (OCILobGetLength2(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob, (oraub8*)&sourceSize))
+			ExitWithError(oraAllInOne, 4, ERROR_OCI, "Error getting BLOB length\n");
+		start_progress_meter(pRemoteFile, sourceSize, &cnt);
+	}
+
 	if ((fp = fopen(pLocalFile, "wb")) == NULL)
 	{
 		ExitWithError(oraAllInOne, 4, ERROR_OS, "Error opening a local file for writing\n");
@@ -568,6 +629,7 @@ END;\
 	result = OCILobRead2(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob, &vSize, 0, 1, blobBuffer, ORA_BLOB_BUFFER_SIZE, OCI_FIRST_PIECE, 0, 0, 0, 0);
 	while (result == OCI_NEED_DATA || result == OCI_SUCCESS)
 	{
+		cnt += vSize;
 		zStrm.avail_in = vSize;
 		zStrm.next_in = blobBuffer;
 		do
@@ -601,6 +663,9 @@ END;\
 			break;
 		result = OCILobRead2(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob, &vSize, 0, 1, blobBuffer, ORA_BLOB_BUFFER_SIZE, OCI_NEXT_PIECE, 0, 0, 0, 0);
 	}
+
+	if (showProgress)
+		stop_progress_meter();
 	inflateEnd(&zStrm);
 	fclose(fp);
 
@@ -627,9 +692,13 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
 	char blobBuffer[ORA_BLOB_BUFFER_SIZE];
 	oraub8 vSize;
 	ub1 piece;
-    int zRet, zFlush;
-    z_stream zStrm;
-    unsigned char zIn[ORA_BLOB_BUFFER_SIZE];
+	int zRet, zFlush;
+	z_stream zStrm;
+	unsigned char zIn[ORA_BLOB_BUFFER_SIZE];
+	int showProgress;
+	off_t cnt;
+	off_t sourceSize;
+	struct stat fileStat;
 
 	struct BINDVARIABLE oraBindsUpload[] =
 	{
@@ -676,6 +745,18 @@ END;\
 	}*/
 	piece = OCI_FIRST_PIECE;
 
+	showProgress = 1;
+	if (!isatty(STDOUT_FILENO))
+		showProgress = 0;
+	cnt = 0;
+	if (showProgress)
+	{
+		stat(pLocalFile, &fileStat);
+		sourceSize = fileStat.st_size;
+		start_progress_meter(pLocalFile, sourceSize, &cnt);
+	}
+
+
 	if ((fp = fopen(pLocalFile, "rb")) == NULL)
 	{
 		ExitWithError(oraAllInOne, 4, ERROR_OS, "Error opening a local file for reading\n");
@@ -694,6 +775,7 @@ END;\
 
 	while (zStrm.avail_in = fread(zIn, sizeof(unsigned char), sizeof(zIn), fp))
 	{
+		cnt += zStrm.avail_in;
 		if (ferror(fp))
 		{
 			(void)deflateEnd(&zStrm);
@@ -734,6 +816,8 @@ END;\
 		while (zStrm.avail_out == 0);
 	}
 
+	if (showProgress)
+		stop_progress_meter();
 	deflateEnd(&zStrm);
 	fclose(fp);
 
