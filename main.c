@@ -1028,10 +1028,7 @@ SELECT t.file_name,\
 		ExitWithUsage(&poptcon);
 	}
 
-	pwdptr = strchr(connectionString, '/');
-	if (pwdptr)
-		*pwdptr++ = '\0';
-	dbconptr = strchr(pwdptr, '@');
+	dbconptr = strchr(connectionString, '@');
 	if (dbconptr)
 		*dbconptr++ = '\0';
 	else
@@ -1039,6 +1036,9 @@ SELECT t.file_name,\
 		fprintf(stderr, "Invalid connection string format\n");
 		ExitWithUsage(&poptcon);
 	}
+	pwdptr = strchr(connectionString, '/');
+	if (pwdptr)
+		*pwdptr++ = '\0';
 
 #ifdef DEBUG
 	printf("Database connection: %s@%s\n", connectionString, dbconptr);
@@ -1202,6 +1202,11 @@ SELECT t.file_name,\
 	}
 
 	poptFreeContext(poptcon);
+
+	if (!pwdptr)
+		pwdptr = getpass("Password: ");
+	if (!pwdptr)
+		ExitWithError(&oraAllInOne, 1, ERROR_OS, 0);
 
 	OracleLogon(&oraAllInOne, connectionString, pwdptr, dbconptr);
 
