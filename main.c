@@ -75,10 +75,9 @@ SELECT d.directory_name,\
 
 	PrepareStmtAndBind(oraAllInOne, &oraStmtLsDir);
 
-	if (ExecuteStmt(oraAllInOne))
-		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to list oracle directories\n");
+	ociResult = ExecuteStmt(oraAllInOne);
 
-	do
+	while (ociResult == OCI_SUCCESS)
 	{
 		printf("%c%c %-30s (%s)\n",
 			   oraStmtLsDir.oraDefines[2].indp == -1 ? '-' :
@@ -91,7 +90,6 @@ SELECT d.directory_name,\
 		ociResult = OCIStmtFetch2(oraStmtLsDir.stmthp, oraAllInOne->errhp, 1,
 								  OCI_FETCH_NEXT, 1, OCI_DEFAULT);
 	}
-	while (ociResult == OCI_SUCCESS);
 
 	if (ociResult != OCI_NO_DATA)
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to list oracle directories\n");
