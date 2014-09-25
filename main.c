@@ -773,8 +773,9 @@ END;\
 		ExitWithError(oraAllInOne, 5, ERROR_NONE, "ZLIB initialization failed\n");
 	}
 
-	while (zStrm.avail_in = fread(zIn, sizeof(unsigned char), sizeof(zIn), fp))
+	while (!feof(fp))
 	{
+		zStrm.avail_in = fread(zIn, sizeof(unsigned char), sizeof(zIn), fp);
 		cnt += zStrm.avail_in;
 		if (ferror(fp))
 		{
@@ -799,8 +800,9 @@ END;\
 			}
 
 			if (zRet == Z_STREAM_END)
-				piece = OCI_LAST_PIECE;
-			vSize = 0;
+				piece = (piece == OCI_FIRST_PIECE) ? OCI_ONE_PIECE : OCI_LAST_PIECE;
+
+			vSize = (piece == OCI_ONE_PIECE) ? ORA_BLOB_BUFFER_SIZE - zStrm.avail_out : 0;
 			if (zStrm.avail_out == ORA_BLOB_BUFFER_SIZE)
 				continue;
 			result = OCILobWrite2(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob, &vSize, 0, 1, blobBuffer, ORA_BLOB_BUFFER_SIZE - zStrm.avail_out, piece, 0, 0, 0, 0);
@@ -811,7 +813,8 @@ END;\
 				/* TODO: remove partially downloaded file */
 				ExitWithError(oraAllInOne, 4, ERROR_OCI, "Error writing to BLOB\n");
 			}
-			piece = OCI_NEXT_PIECE;
+			if (piece == OCI_FIRST_PIECE)
+				piece = OCI_NEXT_PIECE;
 		}
 		while (zStrm.avail_out == 0);
 	}
