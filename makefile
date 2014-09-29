@@ -9,6 +9,9 @@ ifeq ($(UNAME_S),AIX)
 	INCLUDEFLAGS += -I/opt/pware64/include
 # -qlanglvl=ansi
 endif
+ifeq ($(UNAME_S),Linux)
+	LIBFLAGS += -lrt
+endif
 
 ocp: main.o oracle.o strlcat.o atomicio.o misc.o progressmeter.o
 	cc $(CCFLAGS) $(LIBFLAGS) -L$$ORACLE_HOME/lib -lclntsh -lpopt -lz oracle.o strlcat.o atomicio.o misc.o progressmeter.o main.o -oocp

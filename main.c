@@ -26,6 +26,8 @@ Hence no physical or file system access required to a database server.
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <sys/stat.h>
 #include <popt.h>
 #include <zlib.h>
 #include <oci.h>

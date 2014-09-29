@@ -33,6 +33,11 @@
 #include <poll.h>
 #include <string.h>
 #include <unistd.h>
+/*
+ * Modified by Max Satula by adding of an extra include below
+*/
+#define __need_IOV_MAX
+#include <stdio.h>
 
 #include "atomicio.h"
 
