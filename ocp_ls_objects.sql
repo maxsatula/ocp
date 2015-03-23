@@ -58,7 +58,7 @@ public class j_ocp_DirList
 		for (int i = 0; i < files.length; i++)
 		{
 			result[i][0] = files[i].getName();
-			result[i][1] = files[i].length();
+			result[i][1] = new Long(files[i].length());
 			result[i][2] = new Timestamp(files[i].lastModified());
 		}
 		return new ARRAY(arrayDescriptor, conn, result);
