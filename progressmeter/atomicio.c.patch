@@ -1,0 +1,14 @@
+--- atomicio.c.orig	2015-03-29 12:02:02.508726981 -0400
++++ atomicio.c	2015-03-29 11:54:55.114741280 -0400
+@@ -32,6 +32,11 @@
+ #include <poll.h>
+ #include <string.h>
+ #include <unistd.h>
++/*
++ * Modified by Max Satula by adding of an extra include below
++ */
++#define __need_IOV_MAX
++#include <stdio.h>
+ #include <limits.h>
+ 
+ #include "atomicio.h"

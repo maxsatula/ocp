@@ -1,0 +1,38 @@
+--- ax_lib_oracle_oci.m4.orig	2015-03-29 12:02:04.246725378 -0400
++++ ax_lib_oracle_oci.m4	2015-03-29 12:02:43.611724292 -0400
+@@ -163,7 +163,7 @@
+         dnl
+         AC_MSG_CHECKING([for Oracle OCI headers in $oracle_include_dir])
+ 
+-        AC_LANG_PUSH(C++)
++        AC_LANG_PUSH(C)
+         AC_COMPILE_IFELSE([
+             AC_LANG_PROGRAM([[@%:@include <oci.h>]],
+                 [[
+@@ -194,7 +194,7 @@
+             AC_MSG_RESULT([not found])
+             ]
+         )
+-        AC_LANG_POP([C++])
++        AC_LANG_POP([C])
+ 
+         dnl
+         dnl Check OCI libraries
+@@ -203,7 +203,7 @@
+ 
+             AC_MSG_CHECKING([for Oracle OCI libraries in $oracle_lib_dir])
+ 
+-            AC_LANG_PUSH(C++)
++            AC_LANG_PUSH(C)
+             AC_LINK_IFELSE([
+                 AC_LANG_PROGRAM([[@%:@include <oci.h>]],
+                     [[
+@@ -222,7 +222,7 @@
+                 AC_MSG_RESULT([not found])
+                 ]
+             )
+-            AC_LANG_POP([C++])
++            AC_LANG_POP([C])
+         fi
+ 
+         CPPFLAGS="$saved_CPPFLAGS"

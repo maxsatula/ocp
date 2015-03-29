@@ -1,3 +1,9 @@
+2015-03-29  Max Satula <maksym.satula@gmail.com>
+
+* Moved progressmeter related source to a static convenience library
+* Added updateforeigns.sh script to update foreign ("borrowed") source
+  files
+
 2015-03-23  Max Satula <maksym.satula@gmail.com>
 
 * Handed off build process to GNU autotools, started this file

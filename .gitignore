@@ -21,3 +21,24 @@
 *.i*86
 *.x86_64
 *.hex
+
+# Generated autoconf/automake files
+/INSTALL
+Makefile
+Makefile.in
+/aclocal.m4
+/autom4te.cache/
+/autoscan.log
+/compile
+/config.h*
+/config.log
+/config.status
+/configure
+/configure.scan
+/depcomp
+/install-sh
+/missing
+/ocp-*.tar.gz
+.deps/
+src/ocp
+/stamp-h1

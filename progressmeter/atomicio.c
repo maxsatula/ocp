@@ -1,4 +1,4 @@
-/* $OpenBSD: atomicio.c,v 1.26 2010/09/22 22:58:51 djm Exp $ */
+/* $OpenBSD: atomicio.c,v 1.27 2015/01/16 06:40:12 deraadt Exp $ */
 /*
  * Copyright (c) 2006 Damien Miller. All rights reserved.
  * Copyright (c) 2005 Anil Madhavapeddy. All rights reserved.
@@ -26,7 +26,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/param.h>
 #include <sys/uio.h>
 
 #include <errno.h>
@@ -37,16 +36,8 @@
  * Modified by Max Satula by adding of an extra include below
  */
 #define __need_IOV_MAX
-
-/*
- * Modified by Olex Siroklyn to support Solaris
- */
-#ifdef __sun
-# include <limits.h>
-  /* optionally: #define IOV_MAX _XOPEN_IOV_MAX */
-#endif
-
 #include <stdio.h>
+#include <limits.h>
 
 #include "atomicio.h"
 

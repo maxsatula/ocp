@@ -1,0 +1,17 @@
+--- progressmeter.c.orig	2015-03-29 12:02:01.510724752 -0400
++++ progressmeter.c	2015-03-29 12:13:33.926697110 -0400
+@@ -38,6 +38,14 @@
+ #include "atomicio.h"
+ #include "misc.h"
+ 
++/*
++ * Modified by Olex Siroklyn to support Solaris
++ */
++#ifdef __sun
++  /* TIOCGWINSZ declaration */
++# include <termios.h>
++#endif
++
+ #define DEFAULT_WINSIZE 80
+ #define MAX_WINSIZE 512
+ #define PADDING 1		/* padding between the progress indicators */
