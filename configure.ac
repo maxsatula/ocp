@@ -9,7 +9,7 @@ AC_CONFIG_SRCDIR([src/oracle.c])
 AC_CONFIG_HEADERS([config.h])
 
 # Checks for programs.
-# native compiler goes first
+# native compiler goes first, otherwise may not compile in AIX
 AC_PROG_CC([cc gcc])
 
 # Checks for libraries.
@@ -32,7 +32,7 @@ AC_SEARCH_LIBS([deflateInit2_], [z])
 AC_SEARCH_LIBS([clock_gettime], [rt])
 
 # Checks for header files.
-AC_CHECK_HEADERS([popt.h zlib.h])
+##AC_CHECK_HEADERS([popt.h zlib.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 
