@@ -11,6 +11,9 @@ AC_CONFIG_HEADERS([config.h])
 # Checks for programs.
 # native compiler goes first, otherwise may not compile in AIX
 AC_PROG_CC([cc gcc])
+AC_PROG_INSTALL
+AC_PROG_RANLIB
+AM_PROG_CC_C_O
 
 # Checks for libraries.
 AX_LIB_ORACLE_OCI
@@ -39,5 +42,6 @@ AC_SEARCH_LIBS([clock_gettime], [rt])
 # Checks for library functions.
 
 AC_CONFIG_FILES([Makefile
+	progressmeter/Makefile
 	src/Makefile])
 AC_OUTPUT
