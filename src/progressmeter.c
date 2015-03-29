@@ -38,6 +38,14 @@
 #include "atomicio.h"
 #include "misc.h"
 
+/*
+ * Modified by Olex Siroklyn to support Solaris
+ */
+#ifdef __sun
+  /* TIOCGWINSZ declaration */
+# include <termios.h>
+#endif
+
 #define DEFAULT_WINSIZE 80
 #define MAX_WINSIZE 512
 #define PADDING 1		/* padding between the progress indicators */

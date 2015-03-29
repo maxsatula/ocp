@@ -35,8 +35,17 @@
 #include <unistd.h>
 /*
  * Modified by Max Satula by adding of an extra include below
-*/
+ */
 #define __need_IOV_MAX
+
+/*
+ * Modified by Olex Siroklyn to support Solaris
+ */
+#ifdef __sun
+# include <limits.h>
+  /* optionally: #define IOV_MAX _XOPEN_IOV_MAX */
+#endif
+
 #include <stdio.h>
 
 #include "atomicio.h"
