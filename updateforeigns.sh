@@ -41,6 +41,10 @@ download "http://openbsd.cs.toronto.edu/cgi-bin/cvsweb/~checkout~/src/lib/libc/s
          progressmeter/strlcat.c.orig
 download "http://git.savannah.gnu.org/gitweb/?p=autoconf-archive.git;a=blob_plain;f=m4/ax_lib_oracle_oci.m4" \
          m4/ax_lib_oracle_oci.m4.orig
+download "http://git.savannah.gnu.org/gitweb/?p=gnulib.git;a=blob_plain;f=lib/yesno.h;hb=HEAD" \
+         yesno/yesno.h
+download "http://git.savannah.gnu.org/gitweb/?p=gnulib.git;a=blob_plain;f=lib/yesno.c;hb=HEAD" \
+         yesno/yesno.c
 
 # 2. Apply patches
 

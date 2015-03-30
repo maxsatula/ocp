@@ -43,5 +43,6 @@ AC_SEARCH_LIBS([clock_gettime], [rt])
 
 AC_CONFIG_FILES([Makefile
 	progressmeter/Makefile
+	yesno/Makefile
 	src/Makefile])
 AC_OUTPUT

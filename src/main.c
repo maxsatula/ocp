@@ -24,19 +24,21 @@ Hence no physical or file system access required to a database server.
 
 *****************************************************************************/
 
+#if HAVE_CONFIG_H
+# include <config.h>
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/stat.h>
-#ifdef __gnu_linux__
-  /* STDOUT_FILENO declaration */
-# include <unistd.h>
-#endif
+#include <unistd.h>
 #include <popt.h>
 #include <zlib.h>
 #include <oci.h>
 #include "oracle.h"
 #include "progressmeter.h"
+#include "yesno.h"
 
 #define ORA_RAW_BUFFER_SIZE 0x4000
 #define ORA_BLOB_BUFFER_SIZE 0x10000
@@ -44,6 +46,48 @@ Hence no physical or file system access required to a database server.
 
 enum PROGRAM_ACTION { ACTION_READ, ACTION_WRITE, ACTION_LSDIR, ACTION_LS, ACTION_RM,
 	ACTION_GZIP, ACTION_GUNZIP, ACTION_INSTALL, ACTION_DEINSTALL };
+
+enum TRANSFER_MODE { TRANSFER_MODE_INTERACTIVE, TRANSFER_MODE_OVERWRITE, TRANSFER_MODE_FAIL, TRANSFER_MODE_RESUME };
+
+struct ORACLEFILEATTR
+{
+	sb1 bExists;
+	ub8 length;
+};
+
+void GetOracleFileAttr(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, char* pFileName, struct ORACLEFILEATTR *oraFileAttr)
+{
+	struct BINDVARIABLE bindVariablesFattr[] =
+	{
+		{ 0, SQLT_STR, ":directory", pDirectory,            ORA_IDENTIFIER_SIZE + 1      },
+		{ 0, SQLT_STR, ":filename",  pFileName,             MAX_FMT_SIZE                 },
+		{ 0, SQLT_INT, ":length",    &oraFileAttr->length,  sizeof(oraFileAttr->length)  },
+		{ 0, SQLT_INT, ":exists",    &oraFileAttr->bExists, sizeof(oraFileAttr->bExists) }
+	};
+
+	struct ORACLESTATEMENT oraStmtFattr = { "\
+declare \
+  exists_ BOOLEAN; \
+  length_ NUMBER; \
+  blocksize_ NUMBER; \
+begin \
+  utl_file.fgetattr(:directory, :filename, exists_, length_, blocksize_); \
+  if not exists_ and length_ is null then \
+    :length := 0; \
+  else \
+    :length := length_; \
+  end if; \
+  :exists := case when exists_ then 1 else 0 end; \
+end;",
+	       0, bindVariablesFattr, sizeof(bindVariablesFattr)/sizeof(struct BINDVARIABLE), 0, 0 };
+
+        PrepareStmtAndBind(oraAllInOne, &oraStmtFattr);
+
+        if (ExecuteStmt(oraAllInOne))
+                ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to get remote file attributes\n");
+
+        ReleaseStmt(oraAllInOne);
+}
 
 void LsDir(struct ORACLEALLINONE *oraAllInOne)
 {
@@ -203,6 +247,7 @@ void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
 	off_t cnt;
 	off_t sourceSize;
 	struct stat fileStat;
+	struct ORACLEFILEATTR oracleFileAttr;
 
 	OCIBind *ociBind;
 
@@ -248,22 +293,6 @@ begin \
   utl_file.fclose(handle); \
 end;",
 	       0, bindVariablesClose, sizeof(bindVariablesClose)/sizeof(struct BINDVARIABLE), 0, 0 };
-
-	struct BINDVARIABLE bindVariablesFsize[] =
-	{
-		{ 0, SQLT_STR, ":directory", pDirectory,  ORA_IDENTIFIER_SIZE + 1 },
-		{ 0, SQLT_STR, ":filename",  pRemoteFile, MAX_FMT_SIZE            },
-		{ 0, SQLT_INT, ":length",    &sourceSize, sizeof(sourceSize)      }
-	};
-
-	struct ORACLESTATEMENT oraStmtFsize = { "\
-declare \
-  exists_ BOOLEAN;\
-  blocksize_ NUMBER; \
-begin \
-  utl_file.fgetattr(:directory, :filename, exists_, :length, blocksize_); \
-end;",
-	       0, bindVariablesFsize, sizeof(bindVariablesFsize)/sizeof(struct BINDVARIABLE), 0, 0 };
 
 	struct BINDVARIABLE bindVariablesRead[] =
 	{
@@ -323,10 +352,8 @@ end;",
 	{
 		if (readingDirection)
 		{
-			PrepareStmtAndBind(oraAllInOne, &oraStmtFsize);
-			if (ExecuteStmt(oraAllInOne))
-				ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to obtain Oracle remote file size\n");
-			ReleaseStmt(oraAllInOne);
+			GetOracleFileAttr(oraAllInOne, pDirectory, pRemoteFile, &oracleFileAttr);
+			sourceSize = oracleFileAttr.length;
 		}
 		else
 		{
@@ -860,6 +887,7 @@ struct PROGRAM_OPTIONS
 	const char* lsDirectoryName;
 	int compressionLevel;
 	int isBackground;
+	enum TRANSFER_MODE transferMode;
 	const char* connectionString;
 };
 
@@ -905,6 +933,23 @@ void SplitToDirectoryAndFileName(poptContext *poptcon, char* pDirectory, char* p
 	}
 }
 
+void ConfirmOverwrite(struct ORACLEALLINONE *oraAllInOne, struct PROGRAM_OPTIONS *programOptions, const char *fileName)
+{
+	switch (programOptions->transferMode)
+	{
+	case TRANSFER_MODE_FAIL:
+		ExitWithError(oraAllInOne, 1, ERROR_NONE, "File already exists on destination\n");
+		break;
+	case TRANSFER_MODE_INTERACTIVE:
+		/* TODO: if !isatty then just fail w/o asking? */
+		fprintf (stderr, "%s: overwrite %s? ",
+		         PACKAGE, fileName);
+		if (!yesno())
+			ExitWithError(oraAllInOne, 0, ERROR_NONE, 0);
+		break;
+	}
+}
+
 int main(int argc, const char *argv[])
 {
 	char connectionString[MAX_FMT_SIZE];
@@ -924,8 +969,16 @@ SELECT t.file_name,\
  WHERE d.directory_name = :directory";
 	struct ORACLEALLINONE oraAllInOne = { 0, 0, 0, 0 };
 	struct PROGRAM_OPTIONS programOptions;
+	struct ORACLEFILEATTR oracleFileAttr;
 	poptContext poptcon;
 	int rc;
+
+	struct poptOption transferModeOptions[] =
+	{
+		{ "interactive", 'i', POPT_ARG_VAL, &programOptions.transferMode, TRANSFER_MODE_INTERACTIVE, "prompt before overwrite (overrides a previous -f option)" },
+		{ "force",       'f', POPT_ARG_VAL, &programOptions.transferMode, TRANSFER_MODE_OVERWRITE, "force overwrite an existing file (overrides a previous -i option)" },
+		POPT_TABLEEND
+	};
 
 	struct poptOption compressionOptions[] =
 	{
@@ -956,6 +1009,7 @@ SELECT t.file_name,\
 		{ "list-directories", '\0', POPT_ARG_NONE, 0, ACTION_LSDIR, "List Oracle directories" },
 		{ "ls", '\0', POPT_ARG_STRING, &programOptions.lsDirectoryName, ACTION_LS, "List files in Oracle directory", "DIRECTORY" },
 		{ "rm", '\0', POPT_ARG_NONE, 0, ACTION_RM, "Remove file from Oracle directory" },
+		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, transferModeOptions, 0, "Transfer options:" },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, compressionOptions, 0, "Compression options:" },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, objOptions, 0, "Database objects for --ls support:" },
 		POPT_AUTOHELP
@@ -966,6 +1020,7 @@ SELECT t.file_name,\
 	programOptions.lsDirectoryName = 0;
 	programOptions.compressionLevel = 0;
 	programOptions.isBackground = 0;
+	programOptions.transferMode = TRANSFER_MODE_FAIL;
 	programOptions.connectionString = 0;
 
 	poptcon = poptGetContext(NULL, argc, argv, options, 0);
@@ -1220,12 +1275,17 @@ SELECT t.file_name,\
 	switch (programOptions.programAction)
 	{
 	case ACTION_READ:
+		if (access(vLocalFile, F_OK) != -1)
+			ConfirmOverwrite(&oraAllInOne, &programOptions, vLocalFile);
 		if (programOptions.compressionLevel > 0)
 			DownloadFileWithCompression(&oraAllInOne, vDirectory, programOptions.compressionLevel, vRemoteFile, vLocalFile);
 		else
 			TransferFile(&oraAllInOne, 1, vDirectory, vRemoteFile, vLocalFile);
 		break;
 	case ACTION_WRITE:
+		GetOracleFileAttr(&oraAllInOne, vDirectory, vRemoteFile, &oracleFileAttr);
+		if (oracleFileAttr.bExists)
+			ConfirmOverwrite(&oraAllInOne, &programOptions, vRemoteFile);
 		if (programOptions.compressionLevel > 0)
 			UploadFileWithCompression(&oraAllInOne, vDirectory, programOptions.compressionLevel, vRemoteFile, vLocalFile);
 		else
@@ -1241,9 +1301,15 @@ SELECT t.file_name,\
 		Rm(&oraAllInOne, vDirectory, vRemoteFile);
 		break;
 	case ACTION_GZIP:
+		GetOracleFileAttr(&oraAllInOne, vDirectory, vLocalFile, &oracleFileAttr);
+		if (oracleFileAttr.bExists)
+			ConfirmOverwrite(&oraAllInOne, &programOptions, vLocalFile);
 		Compress(&oraAllInOne, vDirectory, programOptions.compressionLevel, vRemoteFile, vLocalFile);
 		break;
 	case ACTION_GUNZIP:
+		GetOracleFileAttr(&oraAllInOne, vDirectory, vLocalFile, &oracleFileAttr);
+		if (oracleFileAttr.bExists)
+			ConfirmOverwrite(&oraAllInOne, &programOptions, vLocalFile);
 		Uncompress(&oraAllInOne, vDirectory, vRemoteFile, vLocalFile);
 		break;
 	default:

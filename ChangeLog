@@ -3,6 +3,9 @@
 * Moved progressmeter related source to a static convenience library
 * Added updateforeigns.sh script to update foreign ("borrowed") source
   files
+* Added -i (--interactive) and -f (--force) options
+* Fail with an error if destination file already exists, unless either
+  -i or -f specified
 
 2015-03-23  Max Satula <maksym.satula@gmail.com>
 
