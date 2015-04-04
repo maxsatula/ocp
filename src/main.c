@@ -234,7 +234,8 @@ void Rm(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, char* pFileName)
 }
 
 void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
-                  char* pDirectory, char* pRemoteFile, char* pLocalFile)
+                  char* pDirectory, char* pRemoteFile, char* pLocalFile,
+                  int isKeepPartial)
 {
 	unsigned char vBuffer[ORA_RAW_BUFFER_SIZE];
 	int vSize;
@@ -368,10 +369,21 @@ end;",
 
 	if ((fp = fopen(pLocalFile, readingDirection ? "wb" : "rb")) == NULL)
 	{
-		ExitWithError(oraAllInOne, 4, ERROR_OS, "Error opening a local %s file for %s\n",
+		ExitWithError(oraAllInOne, -1, ERROR_OS, "Error opening a local %s file for %s\n",
 					  readingDirection ? "destination" : "source",
 					  readingDirection ? "writing"     : "reading");
 		/* 4 - Local filesystem related errors */
+		if (!readingDirection && !isKeepPartial)
+		{
+			PrepareStmtAndBind(oraAllInOne, &oraStmtClose);
+			if (ExecuteStmt(oraAllInOne))
+			{
+				ExitWithError(oraAllInOne, -1, ERROR_OCI, "Error closing an Oracle remote file\n");
+			}
+			ReleaseStmt(oraAllInOne);
+			Rm(oraAllInOne, pDirectory, pRemoteFile);
+		}
+		ExitWithError(oraAllInOne, 4, ERROR_NONE, 0);
 	}
 
 	if (readingDirection)
@@ -382,9 +394,14 @@ end;",
 			if (ExecuteStmt(oraAllInOne))
 			{
 				fclose(fp);
-				/* TODO: remove partially downloaded file */
-				ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed execution of %s\n",
+				ExitWithError(oraAllInOne, -1, ERROR_OCI, "Failed execution of %s\n",
 							  oraAllInOne->currentStmt->sql);
+				if (!isKeepPartial)
+				{
+					if (unlink(pLocalFile))
+						ExitWithError(oraAllInOne, 3, ERROR_OS, "Could not remove partial file %s\n", pLocalFile);
+				}
+				ExitWithError(oraAllInOne, 3, ERROR_NONE, 0);
 			}
 			else
 			{
@@ -392,8 +409,13 @@ end;",
 				if (ferror(fp))
 				{
 					fclose(fp);
-					/* TODO: remove partially downloaded file */
-					ExitWithError(oraAllInOne, 4, ERROR_OS, "Error writing to a local file\n");
+					ExitWithError(oraAllInOne, -1, ERROR_OS, "Error writing to a local file\n");
+					if (!isKeepPartial)
+					{
+						if (unlink(pLocalFile))
+							ExitWithError(oraAllInOne, 4, ERROR_OS, "Could not remove partial file %s\n", pLocalFile);
+					}
+					ExitWithError(oraAllInOne, 4, ERROR_NONE, 0);
 				}
 				cnt += vSize;
 			}
@@ -407,7 +429,18 @@ end;",
 			if (ferror(fp))
 			{
 				fclose(fp);
-				ExitWithError(oraAllInOne, 4, ERROR_OS, "Error reading from a local file\n");
+				ExitWithError(oraAllInOne, -1, ERROR_OS, "Error reading from a local file\n");
+				if (!isKeepPartial)
+				{
+					PrepareStmtAndBind(oraAllInOne, &oraStmtClose);
+					if (ExecuteStmt(oraAllInOne))
+					{
+						ExitWithError(oraAllInOne, -1, ERROR_OCI, "Error closing an Oracle remote file\n");
+					}
+					ReleaseStmt(oraAllInOne);
+					Rm(oraAllInOne, pDirectory, pRemoteFile);
+				}
+				ExitWithError(oraAllInOne, 4, ERROR_NONE, 0);
 			}
 
 			if (OCIBindByName(oraAllInOne->currentStmt->stmthp, &ociBind, oraAllInOne->errhp,
@@ -415,15 +448,37 @@ end;",
 							  vBuffer, vActualSize, SQLT_BIN, 0, 0, 0, 0, 0, OCI_DEFAULT))
 			{
 				fclose(fp);
-				ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to bind :buffer\n");
+				ExitWithError(oraAllInOne, -1, ERROR_OCI, "Failed to bind :buffer\n");
+				if (!isKeepPartial)
+				{
+					PrepareStmtAndBind(oraAllInOne, &oraStmtClose);
+					if (ExecuteStmt(oraAllInOne))
+					{
+						ExitWithError(oraAllInOne, -1, ERROR_OCI, "Error closing an Oracle remote file\n");
+					}
+					ReleaseStmt(oraAllInOne);
+					Rm(oraAllInOne, pDirectory, pRemoteFile);
+				}
+				ExitWithError(oraAllInOne, 4, ERROR_NONE, 0);
 			}
 
 			if (ExecuteStmt(oraAllInOne))
 			{
 				fclose(fp);
 				OCIHandleFree(ociBind, OCI_HTYPE_BIND);
-				ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed execution of %s\n",
+				ExitWithError(oraAllInOne, -1, ERROR_OCI, "Failed execution of %s\n",
 							  oraAllInOne->currentStmt->sql);
+				if (!isKeepPartial)
+				{
+					PrepareStmtAndBind(oraAllInOne, &oraStmtClose);
+					if (ExecuteStmt(oraAllInOne))
+					{
+						ExitWithError(oraAllInOne, -1, ERROR_OCI, "Error closing an Oracle remote file\n");
+					}
+					ReleaseStmt(oraAllInOne);
+					Rm(oraAllInOne, pDirectory, pRemoteFile);
+				}
+				ExitWithError(oraAllInOne, 4, ERROR_NONE, 0);
 			}
 			OCIHandleFree(ociBind, OCI_HTYPE_BIND);
 			cnt += vActualSize;
@@ -566,7 +621,7 @@ END;\
 	ReleaseStmt(oraAllInOne);	
 }
 
-void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compressionLevel, char* pRemoteFile, char* pLocalFile)
+void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compressionLevel, char* pRemoteFile, char* pLocalFile, int isKeepPartial)
 {
 	FILE *fp;
 	sword result;
@@ -684,8 +739,13 @@ END;\
 			{
 				(void)inflateEnd(&zStrm);
 				fclose(fp);
-				/* TODO: remove partially downloaded file */
-				ExitWithError(oraAllInOne, 4, ERROR_OS, "Error writing to a local file\n");
+				ExitWithError(oraAllInOne, -1, ERROR_OS, "Error writing to a local file\n");
+				if (!isKeepPartial)
+				{
+					if (unlink(pLocalFile))
+						ExitWithError(oraAllInOne, 4, ERROR_OS, "Could not remove partial file %s\n", pLocalFile);
+				}
+				ExitWithError(oraAllInOne, 4, ERROR_NONE, 0);
 			}
 		}
 		while (zStrm.avail_out == 0);
@@ -716,7 +776,7 @@ END;\
 	oraAllInOne->blob = 0;
 }
 
-void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compressionLevel, char* pRemoteFile, char* pLocalFile)
+void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compressionLevel, char* pRemoteFile, char* pLocalFile, int isKeepPartial)
 {
 	FILE *fp;
 	sword result;
@@ -730,6 +790,7 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
 	off_t cnt;
 	off_t sourceSize;
 	struct stat fileStat;
+	int isError;
 
 	struct BINDVARIABLE oraBindsUpload[] =
 	{
@@ -841,7 +902,6 @@ END;\
 			{
 				(void)deflateEnd(&zStrm);
 				fclose(fp);
-				/* TODO: remove partially downloaded file */
 				ExitWithError(oraAllInOne, 4, ERROR_OCI, "Error writing to BLOB\n");
 			}
 			if (piece == OCI_FIRST_PIECE)
@@ -865,10 +925,14 @@ END;\
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to close temporary BLOB\n");
 	}*/
 
+	isError = 0;
 	PrepareStmtAndBind(oraAllInOne, &oraStmtUpload);
 
 	if (ExecuteStmt(oraAllInOne))
-		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to decompress file in oracle directory\n");
+	{
+		ExitWithError(oraAllInOne, -1, ERROR_OCI, "Failed to decompress file in oracle directory\n");
+		isError = 1;
+	}
 
 	ReleaseStmt(oraAllInOne);
 
@@ -876,9 +940,17 @@ END;\
 
 	if (OCIDescriptorFree(oraAllInOne->blob, OCI_DTYPE_LOB))
 	{
-		ExitWithError(oraAllInOne, 4, ERROR_NONE, "Failed to free BLOB\n");
+		ExitWithError(oraAllInOne, -1, ERROR_NONE, "Failed to free BLOB\n");
+		isError = 1;
 	}
 	oraAllInOne->blob = 0;
+
+	if (isError)
+	{
+		if (!isKeepPartial)
+			Rm(oraAllInOne, pDirectory, pRemoteFile);
+		ExitWithError(oraAllInOne, 4, ERROR_NONE, 0);
+	}
 }
 
 struct PROGRAM_OPTIONS
@@ -887,6 +959,7 @@ struct PROGRAM_OPTIONS
 	const char* lsDirectoryName;
 	int compressionLevel;
 	int isBackground;
+	int isKeepPartial;
 	enum TRANSFER_MODE transferMode;
 	const char* connectionString;
 };
@@ -975,8 +1048,10 @@ SELECT t.file_name,\
 
 	struct poptOption transferModeOptions[] =
 	{
-		{ "interactive", 'i', POPT_ARG_VAL, &programOptions.transferMode, TRANSFER_MODE_INTERACTIVE, "prompt before overwrite (overrides a previous -f option)" },
-		{ "force",       'f', POPT_ARG_VAL, &programOptions.transferMode, TRANSFER_MODE_OVERWRITE, "force overwrite an existing file (overrides a previous -i option)" },
+		{ "interactive", 'i', POPT_ARG_VAL, &programOptions.transferMode, TRANSFER_MODE_INTERACTIVE, "prompt before overwrite (overrides previous -f -c options)" },
+		{ "force",       'f', POPT_ARG_VAL, &programOptions.transferMode, TRANSFER_MODE_OVERWRITE, "force overwrite an existing file (overrides previous -i -c options)" },
+		{ "keep-partial", '\0', POPT_ARG_VAL, &programOptions.isKeepPartial, 1, "if error occured, do not delete partially transferred file" },
+		{ "continue", 'c', POPT_ARG_VAL, &programOptions.transferMode, TRANSFER_MODE_RESUME, "resume transfer (implies --keep-partial) (overrides previous -f -i options)" },
 		POPT_TABLEEND
 	};
 
@@ -1020,6 +1095,7 @@ SELECT t.file_name,\
 	programOptions.lsDirectoryName = 0;
 	programOptions.compressionLevel = 0;
 	programOptions.isBackground = 0;
+	programOptions.isKeepPartial = 0;
 	programOptions.transferMode = TRANSFER_MODE_FAIL;
 	programOptions.connectionString = 0;
 
@@ -1101,6 +1177,8 @@ SELECT t.file_name,\
 	pwdptr = strchr(connectionString, '/');
 	if (pwdptr)
 		*pwdptr++ = '\0';
+	if (programOptions.transferMode == TRANSFER_MODE_RESUME)
+		programOptions.isKeepPartial = 1;
 
 #ifdef DEBUG
 	printf("Database connection: %s@%s\n", connectionString, dbconptr);
@@ -1278,18 +1356,18 @@ SELECT t.file_name,\
 		if (access(vLocalFile, F_OK) != -1)
 			ConfirmOverwrite(&oraAllInOne, &programOptions, vLocalFile);
 		if (programOptions.compressionLevel > 0)
-			DownloadFileWithCompression(&oraAllInOne, vDirectory, programOptions.compressionLevel, vRemoteFile, vLocalFile);
+			DownloadFileWithCompression(&oraAllInOne, vDirectory, programOptions.compressionLevel, vRemoteFile, vLocalFile, programOptions.isKeepPartial);
 		else
-			TransferFile(&oraAllInOne, 1, vDirectory, vRemoteFile, vLocalFile);
+			TransferFile(&oraAllInOne, 1, vDirectory, vRemoteFile, vLocalFile, programOptions.isKeepPartial);
 		break;
 	case ACTION_WRITE:
 		GetOracleFileAttr(&oraAllInOne, vDirectory, vRemoteFile, &oracleFileAttr);
 		if (oracleFileAttr.bExists)
 			ConfirmOverwrite(&oraAllInOne, &programOptions, vRemoteFile);
 		if (programOptions.compressionLevel > 0)
-			UploadFileWithCompression(&oraAllInOne, vDirectory, programOptions.compressionLevel, vRemoteFile, vLocalFile);
+			UploadFileWithCompression(&oraAllInOne, vDirectory, programOptions.compressionLevel, vRemoteFile, vLocalFile, programOptions.isKeepPartial);
 		else
-			TransferFile(&oraAllInOne, 0, vDirectory, vRemoteFile, vLocalFile);
+			TransferFile(&oraAllInOne, 0, vDirectory, vRemoteFile, vLocalFile, programOptions.isKeepPartial);
 		break;
 	case ACTION_LSDIR:
 		LsDir(&oraAllInOne);

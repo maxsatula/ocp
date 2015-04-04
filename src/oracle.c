@@ -146,6 +146,9 @@ void ExitWithError(struct ORACLEALLINONE *oraAllInOne, int exitCode, enum ERROR_
 		oraAllInOne->blob = 0;
 	}
 
+	if (exitCode == -1)
+		return;
+
 	if (oraAllInOne->srvhp)
 	{
 		if (oraAllInOne->svchp)
