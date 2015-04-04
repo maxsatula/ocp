@@ -235,13 +235,14 @@ void Rm(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, char* pFileName)
 
 void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
                   char* pDirectory, char* pRemoteFile, char* pLocalFile,
-                  int isKeepPartial)
+                  int isKeepPartial, int isResume)
 {
 	unsigned char vBuffer[ORA_RAW_BUFFER_SIZE];
 	int vSize;
 	FILE *fp;
 	char vOpenMode[3];
 	ub4 vActualSize;
+	ub8 vSkipBytes;
 	ub4 vFHandle1;
 	ub4 vFHandle2;
 	int showProgress;
@@ -265,6 +266,7 @@ void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
 		{ 0, SQLT_STR, ":directory", pDirectory,  ORA_IDENTIFIER_SIZE + 1 },
 		{ 0, SQLT_STR, ":filename",  pRemoteFile, MAX_FMT_SIZE            },
 		{ 0, SQLT_STR, ":openmode",  vOpenMode,   sizeof(vOpenMode)       },
+		{ 0, SQLT_INT, ":skipbytes", &vSkipBytes, sizeof(vSkipBytes)      },
 		{ 0, SQLT_INT, ":fhandle1",  &vFHandle1,  sizeof(vFHandle1)       },
 		{ 0, SQLT_INT, ":fhandle2",  &vFHandle2,  sizeof(vFHandle2)       }
 	};
@@ -274,6 +276,19 @@ declare \
   handle utl_file.file_type; \
 begin \
   handle := utl_file.fopen(:directory, :filename, :openmode); \
+  if :skipbytes > 0 then \
+    declare \
+      buffer_ raw(16384); \
+      leftToSkip_ number := :skipbytes; \
+      size_ number; \
+    begin \
+      while leftToSkip_ > 0 loop \
+        size_ := least(leftToSkip_, 16384); \
+        utl_file.get_raw(handle, buffer_, size_); \
+        leftToSkip_ := leftToSkip_ - size_; \
+      end loop; \
+    end; \
+  end if; \
   :fhandle1 := handle.id; \
   :fhandle2 := handle.datatype; \
 end;",
@@ -334,9 +349,28 @@ begin \
 end;",
 	       0, bindVariablesWrite, sizeof(bindVariablesWrite)/sizeof(struct BINDVARIABLE), 0, 0 };
 
+	cnt = 0;
+	vSkipBytes = 0;
 
-	strcpy(vOpenMode, readingDirection ? "rb" : "wb");
+	if (isResume)
+	{
+		if (readingDirection)
+		{
+			if (!stat(pLocalFile, &fileStat))
+				vSkipBytes = cnt = fileStat.st_size;
+		}
+		else
+		{
+			GetOracleFileAttr(oraAllInOne, pDirectory, pRemoteFile, &oracleFileAttr);
+			if (oracleFileAttr.bExists)
+				cnt = oracleFileAttr.length;
+		}
+		if (!cnt)
+			isResume = 0;
+	}
 
+
+	strcpy(vOpenMode, readingDirection ? "rb" : isResume ? "ab" : "wb");
 	PrepareStmtAndBind(oraAllInOne, &oraStmtOpen);
 
 	if (ExecuteStmt(oraAllInOne))
@@ -348,7 +382,7 @@ end;",
 	showProgress = 1;
 	if (!isatty(STDOUT_FILENO))
 		showProgress = 0;
-	cnt = 0;
+
 	if (showProgress)
 	{
 		if (readingDirection)
@@ -367,7 +401,7 @@ end;",
 
 	PrepareStmtAndBind(oraAllInOne, readingDirection ? &oraStmtRead : &oraStmtWrite);
 
-	if ((fp = fopen(pLocalFile, readingDirection ? "wb" : "rb")) == NULL)
+	if ((fp = fopen(pLocalFile, readingDirection ? (isResume ? "ab" : "wb") : "rb")) == NULL)
 	{
 		ExitWithError(oraAllInOne, -1, ERROR_OS, "Error opening a local %s file for %s\n",
 					  readingDirection ? "destination" : "source",
@@ -424,6 +458,15 @@ end;",
 	}
 	else
 	{
+		if (cnt > 0)
+		{
+			if (fseek(fp, cnt, SEEK_SET))
+			{
+				fclose(fp);
+				ExitWithError(oraAllInOne, 4, ERROR_OS, "Error setting reading position in a local file\n");
+			}
+		
+		}
 		while (vActualSize = fread(vBuffer, sizeof(unsigned char), sizeof(vBuffer), fp))
 		{
 			if (ferror(fp))
@@ -621,11 +664,14 @@ END;\
 	ReleaseStmt(oraAllInOne);	
 }
 
-void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compressionLevel, char* pRemoteFile, char* pLocalFile, int isKeepPartial)
+void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirectory,
+                                 int compressionLevel, char* pRemoteFile, char* pLocalFile,
+                                 int isKeepPartial, int isResume)
 {
 	FILE *fp;
 	sword result;
 	ub4 vCompressionLevel;
+	ub8 vSkipBytes;
 	char blobBuffer[ORA_BLOB_BUFFER_SIZE];
 	oraub8 vSize;
 	int zRet;
@@ -634,13 +680,15 @@ void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDire
 	int showProgress;
 	off_t cnt;
 	off_t sourceSize;
+        struct stat fileStat;
 
 	struct BINDVARIABLE oraBindsDownload[] =
 	{
 		{ 0, SQLT_STR,  ":directory",         pDirectory,         ORA_IDENTIFIER_SIZE + 1   },
 		{ 0, SQLT_INT,  ":compression_level", &vCompressionLevel, sizeof(vCompressionLevel) },
 		{ 0, SQLT_STR,  ":filename",          pRemoteFile,        MAX_FMT_SIZE              },
-		{ 0, SQLT_BLOB, ":blob",              &oraAllInOne->blob, sizeof(oraAllInOne->blob) }
+		{ 0, SQLT_BLOB, ":blob",              &oraAllInOne->blob, sizeof(oraAllInOne->blob) },
+		{ 0, SQLT_INT,  ":skipbytes",         &vSkipBytes,        sizeof(vSkipBytes)        }
 	};
 
 	struct ORACLESTATEMENT oraStmtDownload = { "\
@@ -650,6 +698,18 @@ DECLARE\
 	raw_buffer RAW(32767);\
 BEGIN\
 	f_handle := UTL_FILE.FOPEN(:directory, :filename, 'rb');\
+	if :skipbytes > 0 then \
+		declare \
+			leftToSkip_ number := :skipbytes; \
+			size_ number; \
+		begin \
+			while leftToSkip_ > 0 loop \
+				size_ := least(leftToSkip_, 16384); \
+				utl_file.get_raw(f_handle, raw_buffer, size_); \
+				leftToSkip_ := leftToSkip_ - size_; \
+			end loop; \
+		end; \
+	end if; \
 	DBMS_LOB.CREATETEMPORARY(:blob, TRUE, DBMS_LOB.CALL);\
 	IF :compression_level > 0 THEN\
 		c_handle := UTL_COMPRESS.LZ_COMPRESS_OPEN(:blob, :compression_level);\
@@ -678,6 +738,16 @@ END;\
 		ExitWithError(oraAllInOne, 4, ERROR_NONE, "Failed to allocate BLOB\n");
 	}
 
+	cnt = 0;
+	vSkipBytes = 0;
+	if (isResume)
+	{
+		if (!stat(pLocalFile, &fileStat))
+			vSkipBytes = cnt = fileStat.st_size;
+		if (!cnt)
+			isResume = 0;
+	}
+
 	PrepareStmtAndBind(oraAllInOne, &oraStmtDownload);
 
 	if (ExecuteStmt(oraAllInOne))
@@ -686,7 +756,6 @@ END;\
 	showProgress = 1;
 	if (!isatty(STDOUT_FILENO))
 		showProgress = 0;
-	cnt = 0;
 	if (showProgress)
 	{
 		if (OCILobGetLength2(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob, (oraub8*)&sourceSize))
@@ -694,16 +763,16 @@ END;\
 		start_progress_meter(pRemoteFile, sourceSize, &cnt);
 	}
 
-	if ((fp = fopen(pLocalFile, "wb")) == NULL)
+	if ((fp = fopen(pLocalFile, isResume ? "ab" : "wb")) == NULL)
 	{
 		ExitWithError(oraAllInOne, 4, ERROR_OS, "Error opening a local file for writing\n");
 	}
 
 	zStrm.zalloc = Z_NULL;
-    zStrm.zfree = Z_NULL;
-    zStrm.opaque = Z_NULL;
-    zStrm.avail_in = 0;
-    zStrm.next_in = Z_NULL;
+	zStrm.zfree = Z_NULL;
+	zStrm.opaque = Z_NULL;
+	zStrm.avail_in = 0;
+	zStrm.next_in = Z_NULL;
 	zRet = inflateInit2(&zStrm, 16+MAX_WBITS);
 	if (zRet != Z_OK)
 	{
@@ -776,12 +845,15 @@ END;\
 	oraAllInOne->blob = 0;
 }
 
-void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compressionLevel, char* pRemoteFile, char* pLocalFile, int isKeepPartial)
+void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirectory,
+                               int compressionLevel, char* pRemoteFile, char* pLocalFile,
+                               int isKeepPartial, int isResume)
 {
 	FILE *fp;
 	sword result;
 	char blobBuffer[ORA_BLOB_BUFFER_SIZE];
 	oraub8 vSize;
+	char vOpenMode[3];
 	ub1 piece;
 	int zRet, zFlush;
 	z_stream zStrm;
@@ -791,12 +863,14 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
 	off_t sourceSize;
 	struct stat fileStat;
 	int isError;
+	struct ORACLEFILEATTR oracleFileAttr;
 
 	struct BINDVARIABLE oraBindsUpload[] =
 	{
-		{ 0, SQLT_STR,  ":directory",         pDirectory,         ORA_IDENTIFIER_SIZE + 1   },
-		{ 0, SQLT_STR,  ":filename",          pRemoteFile,        MAX_FMT_SIZE              },
-		{ 0, SQLT_BLOB, ":blob",              &oraAllInOne->blob, sizeof(oraAllInOne->blob) }
+		{ 0, SQLT_STR,  ":directory", pDirectory,         ORA_IDENTIFIER_SIZE + 1   },
+		{ 0, SQLT_STR,  ":filename",  pRemoteFile,        MAX_FMT_SIZE              },
+		{ 0, SQLT_STR,  ":openmode",  vOpenMode,          sizeof(vOpenMode)         },
+		{ 0, SQLT_BLOB, ":blob",      &oraAllInOne->blob, sizeof(oraAllInOne->blob) }
 	};
 
 	struct ORACLESTATEMENT oraStmtUpload = { "\
@@ -806,7 +880,7 @@ DECLARE\
 	raw_buffer RAW(32767);\
 BEGIN\
 	c_handle := UTL_COMPRESS.LZ_UNCOMPRESS_OPEN(:blob);\
-	f_handle := UTL_FILE.FOPEN(:directory, :filename, 'wb');\
+	f_handle := UTL_FILE.FOPEN(:directory, :filename, :openmode);\
 	LOOP\
 		BEGIN\
 			UTL_COMPRESS.LZ_UNCOMPRESS_EXTRACT(c_handle, raw_buffer);\
@@ -841,6 +915,15 @@ END;\
 	if (!isatty(STDOUT_FILENO))
 		showProgress = 0;
 	cnt = 0;
+	if (isResume)
+	{
+		GetOracleFileAttr(oraAllInOne, pDirectory, pRemoteFile, &oracleFileAttr);
+		if (oracleFileAttr.bExists)
+			cnt = oracleFileAttr.length;
+		if (!cnt)
+			isResume = 0;
+	}
+
 	if (showProgress)
 	{
 		stat(pLocalFile, &fileStat);
@@ -852,6 +935,15 @@ END;\
 	if ((fp = fopen(pLocalFile, "rb")) == NULL)
 	{
 		ExitWithError(oraAllInOne, 4, ERROR_OS, "Error opening a local file for reading\n");
+	}
+
+	if (cnt > 0)
+	{
+		if (fseek(fp, cnt, SEEK_SET))
+		{
+			fclose(fp);
+			ExitWithError(oraAllInOne, 4, ERROR_OS, "Error setting reading position in a local file\n");
+		}
 	}
 
 	zStrm.zalloc = Z_NULL;
@@ -926,6 +1018,7 @@ END;\
 	}*/
 
 	isError = 0;
+        strcpy(vOpenMode, isResume ? "ab" : "wb");
 	PrepareStmtAndBind(oraAllInOne, &oraStmtUpload);
 
 	if (ExecuteStmt(oraAllInOne))
@@ -1356,18 +1449,18 @@ SELECT t.file_name,\
 		if (access(vLocalFile, F_OK) != -1)
 			ConfirmOverwrite(&oraAllInOne, &programOptions, vLocalFile);
 		if (programOptions.compressionLevel > 0)
-			DownloadFileWithCompression(&oraAllInOne, vDirectory, programOptions.compressionLevel, vRemoteFile, vLocalFile, programOptions.isKeepPartial);
+			DownloadFileWithCompression(&oraAllInOne, vDirectory, programOptions.compressionLevel, vRemoteFile, vLocalFile, programOptions.isKeepPartial, programOptions.transferMode == TRANSFER_MODE_RESUME);
 		else
-			TransferFile(&oraAllInOne, 1, vDirectory, vRemoteFile, vLocalFile, programOptions.isKeepPartial);
+			TransferFile(&oraAllInOne, 1, vDirectory, vRemoteFile, vLocalFile, programOptions.isKeepPartial, programOptions.transferMode == TRANSFER_MODE_RESUME);
 		break;
 	case ACTION_WRITE:
 		GetOracleFileAttr(&oraAllInOne, vDirectory, vRemoteFile, &oracleFileAttr);
 		if (oracleFileAttr.bExists)
 			ConfirmOverwrite(&oraAllInOne, &programOptions, vRemoteFile);
 		if (programOptions.compressionLevel > 0)
-			UploadFileWithCompression(&oraAllInOne, vDirectory, programOptions.compressionLevel, vRemoteFile, vLocalFile, programOptions.isKeepPartial);
+			UploadFileWithCompression(&oraAllInOne, vDirectory, programOptions.compressionLevel, vRemoteFile, vLocalFile, programOptions.isKeepPartial, programOptions.transferMode == TRANSFER_MODE_RESUME);
 		else
-			TransferFile(&oraAllInOne, 0, vDirectory, vRemoteFile, vLocalFile, programOptions.isKeepPartial);
+			TransferFile(&oraAllInOne, 0, vDirectory, vRemoteFile, vLocalFile, programOptions.isKeepPartial, programOptions.transferMode == TRANSFER_MODE_RESUME);
 		break;
 	case ACTION_LSDIR:
 		LsDir(&oraAllInOne);

@@ -1,6 +1,7 @@
 2015-04-04  Max Satula <maksym.satula@gmail.com>
 
 * Added --keep-partial option
+* Added -c (--continue) option
 
 2015-03-29  Max Satula <maksym.satula@gmail.com>
 

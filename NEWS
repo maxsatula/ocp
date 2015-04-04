@@ -2,6 +2,6 @@ ocp 0.1
 
 * first alpha version of the tool
 * added -i (--interactive) and -f (--force) options
-* added --keep-partial option
+* added --keep-partial and -c (--continue) options
 
 ----------------------------------------------------------------------------
