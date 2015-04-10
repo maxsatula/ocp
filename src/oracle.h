@@ -80,4 +80,6 @@ void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
                  const char* password,
                  const char* connection);
 
+void SetSessionAction(struct ORACLEALLINONE *oraAllInOne, const char* action);
+
 #endif

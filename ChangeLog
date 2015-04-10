@@ -1,3 +1,7 @@
+2015-04-10  Max Satula <maksym.satula@gmail.com>
+
+* Populate MODULE and ACTION columns of V$SESSION
+
 2015-04-09  Max Satula <maksym.satula@gmail.com>
 
 * Process non-critical ORA- warnings during login properly

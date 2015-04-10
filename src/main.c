@@ -123,6 +123,7 @@ SELECT d.directory_name,\
           AND pw.privilege = 'WRITE'",
 	       0, 0, 0, oraDefinesLsDir, sizeof(oraDefinesLsDir)/sizeof(struct ORACLEDEFINE) };
 
+	SetSessionAction(oraAllInOne, "LSDIR");
 	PrepareStmtAndBind(oraAllInOne, &oraStmtLsDir);
 
 	ociResult = ExecuteStmt(oraAllInOne);
@@ -145,6 +146,7 @@ SELECT d.directory_name,\
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to list oracle directories\n");
 
 	ReleaseStmt(oraAllInOne);
+	SetSessionAction(oraAllInOne, 0);
 }
 
 void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
@@ -173,6 +175,7 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 	       0, oraBindsLs, sizeof(oraBindsLs)/sizeof(struct BINDVARIABLE),
 	       oraDefinesLs, sizeof(oraDefinesLs)/sizeof(struct ORACLEDEFINE) };
 
+	SetSessionAction(oraAllInOne, "LS");
 	PrepareStmtAndBind(oraAllInOne, &oraStmtLs);
 
 	if (ExecuteStmt(oraAllInOne))
@@ -211,6 +214,7 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 %5d File(s) %39ld\n", i, totalBytes);
 
 	ReleaseStmt(oraAllInOne);	
+	SetSessionAction(oraAllInOne, 0);
 }
 
 void Rm(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, char* pFileName)
@@ -225,12 +229,14 @@ void Rm(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, char* pFileName)
 	       "BEGIN utl_file.fremove(:directory, :filename); END;",
 	       0, oraBindsRm, sizeof(oraBindsRm)/sizeof(struct BINDVARIABLE), 0, 0 };
 
+	SetSessionAction(oraAllInOne, "RM");
 	PrepareStmtAndBind(oraAllInOne, &oraStmtRm);
 
 	if (ExecuteStmt(oraAllInOne))
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to remove file in oracle directory\n");
 
 	ReleaseStmt(oraAllInOne);	
+	SetSessionAction(oraAllInOne, 0);
 }
 
 void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
@@ -371,6 +377,7 @@ end;",
 
 
 	strcpy(vOpenMode, readingDirection ? "rb" : isResume ? "ab" : "wb");
+	SetSessionAction(oraAllInOne, readingDirection ? "DOWNLOAD" : "UPLOAD");
 	PrepareStmtAndBind(oraAllInOne, &oraStmtOpen);
 
 	if (ExecuteStmt(oraAllInOne))
@@ -539,6 +546,7 @@ end;",
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Error closing an Oracle remote file\n");
 	}
 	ReleaseStmt(oraAllInOne);
+	SetSessionAction(oraAllInOne, 0);
 }
 
 void Compress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compressionLevel,
@@ -600,12 +608,14 @@ END;\
 
 	vCompressionLevel = compressionLevel;
 
+	SetSessionAction(oraAllInOne, "GZIP");
 	PrepareStmtAndBind(oraAllInOne, &oraStmtCompress);
 
 	if (ExecuteStmt(oraAllInOne))
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to compress file in oracle directory\n");
 
-	ReleaseStmt(oraAllInOne);	
+	ReleaseStmt(oraAllInOne);
+	SetSessionAction(oraAllInOne, 0);
 }
 
 void Uncompress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory,
@@ -656,12 +666,14 @@ END;\
 ",
 	       0, oraBindsUncompress, sizeof(oraBindsUncompress)/sizeof(struct BINDVARIABLE), 0, 0 };
 
+	SetSessionAction(oraAllInOne, "GUNZIP");
 	PrepareStmtAndBind(oraAllInOne, &oraStmtUncompress);
 
 	if (ExecuteStmt(oraAllInOne))
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to uncompress file in oracle directory\n");
 
 	ReleaseStmt(oraAllInOne);	
+	SetSessionAction(oraAllInOne, 0);
 }
 
 void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirectory,
@@ -733,6 +745,7 @@ END;\
 
 	vCompressionLevel = compressionLevel;
 
+	SetSessionAction(oraAllInOne, "GZIP_AND_DOWNLOAD: GZIP");
 	if (OCIDescriptorAlloc(oraAllInOne->envhp, (void**)&oraAllInOne->blob, OCI_DTYPE_LOB, 0, 0))
 	{
 		ExitWithError(oraAllInOne, 4, ERROR_NONE, "Failed to allocate BLOB\n");
@@ -763,6 +776,7 @@ END;\
 		start_progress_meter(pRemoteFile, sourceSize, &cnt);
 	}
 
+	SetSessionAction(oraAllInOne, "GZIP_AND_DOWNLOAD: DOWNLOAD");
 	if ((fp = fopen(pLocalFile, isResume ? "ab" : "wb")) == NULL)
 	{
 		ExitWithError(oraAllInOne, 4, ERROR_OS, "Error opening a local file for writing\n");
@@ -835,6 +849,7 @@ END;\
 	}
 
 	ReleaseStmt(oraAllInOne);
+	SetSessionAction(oraAllInOne, 0);
 
 	OCILobFreeTemporary(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob);
 
@@ -896,6 +911,7 @@ END;\
 ",
 	       0, oraBindsUpload, sizeof(oraBindsUpload)/sizeof(struct BINDVARIABLE), 0, 0 };
 
+	SetSessionAction(oraAllInOne, "UPLOAD_AND_GUNZIP: UPLOAD");
 	if (OCIDescriptorAlloc(oraAllInOne->envhp, (void**)&oraAllInOne->blob, OCI_DTYPE_LOB, 0, 0))
 	{
 		ExitWithError(oraAllInOne, 4, ERROR_NONE, "Failed to allocate BLOB\n");
@@ -1019,6 +1035,7 @@ END;\
 
 	isError = 0;
         strcpy(vOpenMode, isResume ? "ab" : "wb");
+	SetSessionAction(oraAllInOne, "UPLOAD_AND_GUNZIP: GUNZIP");
 	PrepareStmtAndBind(oraAllInOne, &oraStmtUpload);
 
 	if (ExecuteStmt(oraAllInOne))
@@ -1028,6 +1045,7 @@ END;\
 	}
 
 	ReleaseStmt(oraAllInOne);
+	SetSessionAction(oraAllInOne, 0);
 
 	OCILobFreeTemporary(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob);
 

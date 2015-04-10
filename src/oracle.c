@@ -276,4 +276,20 @@ void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
 			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to login to a database\n");
 		}
 	}
+
+	if (OCIAttrSet(oraAllInOne->usrhp, OCI_HTYPE_SESSION,
+	               "ocp", 3, OCI_ATTR_MODULE, oraAllInOne->errhp))
+	{
+		ExitWithError(oraAllInOne, -1, ERROR_OCI, "Could not set MODULE in V$SESSION\n");
+	}
 }
+
+void SetSessionAction(struct ORACLEALLINONE *oraAllInOne, const char* action)
+{
+	if (OCIAttrSet(oraAllInOne->usrhp, OCI_HTYPE_SESSION,
+	               action, action ? strlen(action) : 0, OCI_ATTR_ACTION, oraAllInOne->errhp))
+	{
+		ExitWithError(oraAllInOne, -1, ERROR_OCI, "Could not set ACTION in V$SESSION\n");
+	}
+}
+
