@@ -194,6 +194,8 @@ void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
                  const char* password,
                  const char* connection)
 {
+	sword result;
+
 	if (OCIEnvCreate(&oraAllInOne->envhp, (ub4)OCI_DEFAULT,
 					(void  *)0, (void  * (*)(void  *, size_t))0,
 					(void  * (*)(void  *, void  *, size_t))0,
@@ -212,11 +214,17 @@ void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
 
 	if (*userName)
 	{
-		if (OCILogon2(oraAllInOne->envhp, oraAllInOne->errhp, &oraAllInOne->svchp,
-		              (text*)userName, (ub4)strlen(userName),
-		              (text*)password, (ub4)strlen(password),
-		              (text*)connection, (ub4)strlen(connection), OCI_DEFAULT))
+		result = OCILogon2(oraAllInOne->envhp, oraAllInOne->errhp, &oraAllInOne->svchp,
+		                   (text*)userName, (ub4)strlen(userName),
+		                   (text*)password, (ub4)strlen(password),
+		                   (text*)connection, (ub4)strlen(connection), OCI_DEFAULT);
+		switch (result)
 		{
+		case OCI_SUCCESS_WITH_INFO:
+			ExitWithError(oraAllInOne, -1, ERROR_OCI, 0);
+		case OCI_SUCCESS:
+			break;
+		default:
 			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to login to a database\n");
 			/* 3 - Failed to login to a database */
 		}
@@ -250,8 +258,15 @@ void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
 			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to login to a database\n");
 		}
 
-		if (OCISessionBegin(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->usrhp, OCI_CRED_EXT, OCI_DEFAULT))
+		result = OCISessionBegin(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->usrhp, OCI_CRED_EXT, OCI_DEFAULT);
+
+		switch (result)
 		{
+		case OCI_SUCCESS_WITH_INFO:
+			ExitWithError(oraAllInOne, -1, ERROR_OCI, 0);
+		case OCI_SUCCESS:
+			break;
+		default:
 			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to login to a database\n");
 		}
 

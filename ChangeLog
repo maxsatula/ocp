@@ -1,3 +1,7 @@
+2015-04-09  Max Satula <maksym.satula@gmail.com>
+
+* Process non-critical ORA- warnings during login properly
+
 2015-04-04  Max Satula <maksym.satula@gmail.com>
 
 * Added --keep-partial option

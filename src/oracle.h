@@ -71,6 +71,7 @@ sword ExecuteStmt(struct ORACLEALLINONE *oraAllInOne);
 
 void ReleaseStmt(struct ORACLEALLINONE *oraAllInOne);
 
+/* if exitCode == -1 then do not exit the program; just print an error message and proceed */
 void ExitWithError(struct ORACLEALLINONE *oraAllInOne, int exitCode, enum ERROR_CLASS errorClass,
                    const char *message, ...);
 
