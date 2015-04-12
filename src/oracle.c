@@ -293,3 +293,29 @@ void SetSessionAction(struct ORACLEALLINONE *oraAllInOne, const char* action)
 	}
 }
 
+void ExecuteSimpleSqls(struct ORACLEALLINONE *oraAllInOne, struct ORACLESIMPLESQL *oracleSimpleSqls)
+{
+	while (oracleSimpleSqls->sql)
+	{
+		sb4 errorCode;
+		char errorMsg[MAX_FMT_SIZE];
+		struct ORACLESTATEMENT stmt;
+
+		stmt.sql = oracleSimpleSqls->sql;
+		stmt.stmthp = 0;
+		stmt.bindVariables = 0;
+		stmt.bindVarsCount = 0;
+		stmt.oraDefines = 0;
+		stmt.oraDefineCount = 0;
+		PrepareStmtAndBind(oraAllInOne, &stmt);
+		if (ExecuteStmt(oraAllInOne))
+		{
+			if (!oracleSimpleSqls->errCodeToIgnore ||
+			    (OCIErrorGet(oraAllInOne->errhp, 1, 0, &errorCode, errorMsg, sizeof(errorMsg), OCI_HTYPE_ERROR),
+			     errorCode != oracleSimpleSqls->errCodeToIgnore))
+				ExitWithError(oraAllInOne, 4, ERROR_OCI, 0);
+		}
+		ReleaseStmt(oraAllInOne);
+		oracleSimpleSqls++;
+	}
+}

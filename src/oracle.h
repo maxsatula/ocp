@@ -54,6 +54,12 @@ struct ORACLESTATEMENT
 	int oraDefineCount;
 };
 
+struct ORACLESIMPLESQL
+{
+	const char* sql;
+	sb4 errCodeToIgnore;
+};
+
 struct ORACLEALLINONE
 {
 	OCIEnv *envhp;
@@ -81,5 +87,7 @@ void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
                  const char* connection);
 
 void SetSessionAction(struct ORACLEALLINONE *oraAllInOne, const char* action);
+
+void ExecuteSimpleSqls(struct ORACLEALLINONE *oraAllInOne, struct ORACLESIMPLESQL *oracleSimpleSqls);
 
 #endif

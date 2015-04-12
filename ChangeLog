@@ -1,3 +1,7 @@
+2015-04-12  Max Satula <maksym.satula@gmail.com>
+
+* Added --install and --deinstall options
+
 2015-04-10  Max Satula <maksym.satula@gmail.com>
 
 * Populate MODULE and ACTION columns of V$SESSION
