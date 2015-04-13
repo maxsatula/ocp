@@ -192,7 +192,8 @@ void ExitWithError(struct ORACLEALLINONE *oraAllInOne, int exitCode, enum ERROR_
 void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
                  const char* userName,
                  const char* password,
-                 const char* connection)
+                 const char* connection,
+                 const char* module)
 {
 	sword result;
 
@@ -278,7 +279,7 @@ void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
 	}
 
 	if (OCIAttrSet(oraAllInOne->usrhp, OCI_HTYPE_SESSION,
-	               "ocp", 3, OCI_ATTR_MODULE, oraAllInOne->errhp))
+	               module, strlen(module), OCI_ATTR_MODULE, oraAllInOne->errhp))
 	{
 		ExitWithError(oraAllInOne, -1, ERROR_OCI, "Could not set MODULE in V$SESSION\n");
 	}

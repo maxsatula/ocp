@@ -1,6 +1,7 @@
 2015-04-12  Max Satula <maksym.satula@gmail.com>
 
 * Added --install and --deinstall options
+* Split sources in main.c into multiple files
 
 2015-04-10  Max Satula <maksym.satula@gmail.com>
 

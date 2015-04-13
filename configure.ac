@@ -5,7 +5,7 @@ AC_PREREQ([2.63])
 AC_INIT([ocp],[0.1],[Max Satula <maksym.satula@gmail.com>])
 AM_INIT_AUTOMAKE
 AC_CONFIG_MACRO_DIR([m4])
-AC_CONFIG_SRCDIR([src/oracle.c])
+AC_CONFIG_SRCDIR([src/ocp.h])
 AC_CONFIG_HEADERS([config.h])
 
 # Checks for programs.

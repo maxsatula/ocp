@@ -17,12 +17,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 *****************************************************************************/
 
-#ifndef oracle_h
-#define oracle_h
+#ifndef _ORACLE_H_
+#define _ORACLE_H_
 
 #include <oci.h>
 
 #define MAX_FMT_SIZE 4096
+#define ORA_IDENTIFIER_SIZE 30
 
 enum ERROR_CLASS { ERROR_NONE, ERROR_OCI, ERROR_OS };
 
@@ -84,7 +85,8 @@ void ExitWithError(struct ORACLEALLINONE *oraAllInOne, int exitCode, enum ERROR_
 void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
                  const char* userName,
                  const char* password,
-                 const char* connection);
+                 const char* connection,
+                 const char* module);
 
 void SetSessionAction(struct ORACLEALLINONE *oraAllInOne, const char* action);
 
