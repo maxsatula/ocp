@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <libgen.h>
 #include <popt.h>
 #include "oracle.h"
 #include "ocp.h"
@@ -123,6 +124,7 @@ SELECT t.file_name,\
   FROM all_directories d,\
        TABLE(f_ocp_dir_list(d.directory_path)) t\
  WHERE d.directory_name = :directory";
+	struct stat fileStat;
 	struct ORACLEALLINONE oraAllInOne = { 0, 0, 0, 0 };
 	struct PROGRAM_OPTIONS programOptions;
 	struct ORACLEFILEATTR oracleFileAttr;
@@ -318,6 +320,25 @@ SELECT t.file_name,\
 		{
 			fprintf(stderr, "Remote file name is too long\n");
 			ExitWithUsage(&poptcon);
+		}
+
+		if (programOptions.programAction == ACTION_READ
+		    && (stat(vLocalFile, &fileStat) == 0)
+		    && fileStat.st_mode & S_IFDIR)
+		{
+			if (strlen(vLocalFile) + 1 + strlen(vRemoteFile) >= sizeof(vLocalFile))
+			{
+				fprintf(stderr, "Local path is too long\n");
+				ExitWithUsage(&poptcon);
+			}
+			strcat(vLocalFile, "/");
+			strcat(vLocalFile, vRemoteFile);
+		}
+
+		if (programOptions.programAction == ACTION_WRITE
+		    && (strlen(vRemoteFile) == 0))
+		{
+			strcpy(vRemoteFile, basename(vLocalFile));
 		}
 
 #ifdef DEBUG

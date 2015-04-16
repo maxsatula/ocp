@@ -1,3 +1,8 @@
+2015-04-16  Max Satula <maksym.satula@gmail.com>
+
+* If destination filename omitted, the source filename is used.
+* Added missing #include
+
 2015-04-12  Max Satula <maksym.satula@gmail.com>
 
 * Added --install and --deinstall options
