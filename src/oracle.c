@@ -24,6 +24,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <string.h>
 #include "oracle.h"
 
+struct BINDVARIABLE NO_BIND_VARIABLES[] = { { 0 } };
+struct ORACLEDEFINE NO_ORACLE_DEFINES[] = { { 0 } };
+
 void PrepareStmtAndBind(struct ORACLEALLINONE *oraAllInOne, struct ORACLESTATEMENT *oracleStatement)
 {
 	int i;
@@ -40,7 +43,7 @@ void PrepareStmtAndBind(struct ORACLEALLINONE *oraAllInOne, struct ORACLESTATEME
 		ExitWithError(oraAllInOne, 2, ERROR_OCI, "Failed to prepare %s\n", oracleStatement->sql);
 	}
 
-	for (i = 0; i < oracleStatement->oraDefineCount; i++)
+	for (i = 0; oracleStatement->oraDefines[i].value; i++)
 	{
 		if (OCIDefineByPos(oracleStatement->stmthp,
 		                   &oracleStatement->oraDefines[i].ociDefine,
@@ -55,7 +58,7 @@ void PrepareStmtAndBind(struct ORACLEALLINONE *oraAllInOne, struct ORACLESTATEME
 		}
 	}
 
-	for (i = 0; i < oracleStatement->bindVarsCount; i++)
+	for (i = 0; oracleStatement->bindVariables[i].value; i++)
 	{
 		if (OCIBindByName(oracleStatement->stmthp,
 		                  &oracleStatement->bindVariables[i].ociBind,
@@ -82,14 +85,14 @@ void ReleaseStmt(struct ORACLEALLINONE *oraAllInOne)
 {
 	int i;
 
-	for (i = oraAllInOne->currentStmt->oraDefineCount - 1; i >= 0; i--)
+	for (i = 0; oraAllInOne->currentStmt->oraDefines[i].value; i++)
 		if (oraAllInOne->currentStmt->oraDefines[i].ociDefine)
 		{
 			OCIHandleFree(oraAllInOne->currentStmt->oraDefines[i].ociDefine, OCI_HTYPE_DEFINE);
 			oraAllInOne->currentStmt->oraDefines[i].ociDefine = 0;
 		}
 
-	for (i = oraAllInOne->currentStmt->bindVarsCount - 1; i >= 0; i--)
+	for (i = 0; oraAllInOne->currentStmt->bindVariables[i].value; i++)
 		if (oraAllInOne->currentStmt->bindVariables[i].ociBind)
 		{
 			OCIHandleFree(oraAllInOne->currentStmt->bindVariables[i].ociBind, OCI_HTYPE_BIND);
@@ -292,10 +295,8 @@ void ExecuteSimpleSqls(struct ORACLEALLINONE *oraAllInOne, struct ORACLESIMPLESQ
 
 		stmt.sql = oracleSimpleSqls->sql;
 		stmt.stmthp = 0;
-		stmt.bindVariables = 0;
-		stmt.bindVarsCount = 0;
-		stmt.oraDefines = 0;
-		stmt.oraDefineCount = 0;
+		stmt.bindVariables = NO_BIND_VARIABLES;
+		stmt.oraDefines = NO_ORACLE_DEFINES;
 		PrepareStmtAndBind(oraAllInOne, &stmt);
 		if (ExecuteStmt(oraAllInOne))
 		{

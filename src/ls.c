@@ -37,20 +37,21 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 
 	struct BINDVARIABLE oraBindsLs[] =
 	{
-		{ 0, SQLT_STR, ":directory", pDirectory, ORA_IDENTIFIER_SIZE + 1 }
+		{ 0, SQLT_STR, ":directory", pDirectory, ORA_IDENTIFIER_SIZE + 1 },
+		{ 0 }
 	};
 
 	struct ORACLEDEFINE oraDefinesLs[] =
 	{
 		{ 0, SQLT_STR, vFileName,     sizeof(vFileName)-1,   0 },
 		{ 0, SQLT_INT, &vBytes,       sizeof(vBytes),        0 },
-		{ 0, SQLT_DAT, vLastModified, sizeof(vLastModified), 0 }
+		{ 0, SQLT_DAT, vLastModified, sizeof(vLastModified), 0 },
+		{ 0 }
 	};
 
 	struct ORACLESTATEMENT oraStmtLs = {
 	       sql,
-	       0, oraBindsLs, sizeof(oraBindsLs)/sizeof(struct BINDVARIABLE),
-	       oraDefinesLs, sizeof(oraDefinesLs)/sizeof(struct ORACLEDEFINE) };
+	       0, oraBindsLs, oraDefinesLs };
 
 	SetSessionAction(oraAllInOne, "LS");
 	PrepareStmtAndBind(oraAllInOne, &oraStmtLs);

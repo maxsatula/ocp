@@ -30,12 +30,13 @@ void Rm(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, char* pFileName)
 	struct BINDVARIABLE oraBindsRm[] =
 	{
 		{ 0, SQLT_STR, ":directory", pDirectory, ORA_IDENTIFIER_SIZE + 1 },
-		{ 0, SQLT_STR, ":filename",  pFileName,  MAX_FMT_SIZE }
+		{ 0, SQLT_STR, ":filename",  pFileName,  MAX_FMT_SIZE },
+		{ 0 }
 	};
 
 	struct ORACLESTATEMENT oraStmtRm = {
 	       "BEGIN utl_file.fremove(:directory, :filename); END;",
-	       0, oraBindsRm, sizeof(oraBindsRm)/sizeof(struct BINDVARIABLE), 0, 0 };
+	       0, oraBindsRm, NO_ORACLE_DEFINES };
 
 	SetSessionAction(oraAllInOne, "RM");
 	PrepareStmtAndBind(oraAllInOne, &oraStmtRm);

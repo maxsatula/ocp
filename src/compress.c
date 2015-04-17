@@ -37,7 +37,8 @@ void Compress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compress
 		{ 0, SQLT_STR, ":directory",           pDirectory,          ORA_IDENTIFIER_SIZE + 1   },
 		{ 0, SQLT_INT, ":compression_level",   &vCompressionLevel,  sizeof(vCompressionLevel) },
 		{ 0, SQLT_STR, ":original_filename"  , pOriginalFileName,   MAX_FMT_SIZE              },
-		{ 0, SQLT_STR, ":compressed_filename", pCompressedFileName, MAX_FMT_SIZE              }
+		{ 0, SQLT_STR, ":compressed_filename", pCompressedFileName, MAX_FMT_SIZE              },
+		{ 0 }
 	};
 
 	struct ORACLESTATEMENT oraStmtCompress = { "\
@@ -82,7 +83,7 @@ BEGIN\
 	UTL_FILE.FCLOSE(f_handle);\
 END;\
 ",
-	       0, oraBindsCompress, sizeof(oraBindsCompress)/sizeof(struct BINDVARIABLE), 0, 0 };
+	       0, oraBindsCompress, NO_ORACLE_DEFINES };
 
 	vCompressionLevel = compressionLevel;
 
@@ -103,7 +104,8 @@ void Uncompress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory,
 	{
 		{ 0, SQLT_STR, ":directory",             pDirectory,            ORA_IDENTIFIER_SIZE + 1 },
 		{ 0, SQLT_STR, ":original_filename"  ,   pOriginalFileName,     MAX_FMT_SIZE            },
-		{ 0, SQLT_STR, ":uncompressed_filename", pUncompressedFileName, MAX_FMT_SIZE            }
+		{ 0, SQLT_STR, ":uncompressed_filename", pUncompressedFileName, MAX_FMT_SIZE            },
+		{ 0 }
 	};
 
 	struct ORACLESTATEMENT oraStmtUncompress = { "\
@@ -142,7 +144,7 @@ BEGIN\
 	DBMS_LOB.FREETEMPORARY(blob_buffer);\
 END;\
 ",
-	       0, oraBindsUncompress, sizeof(oraBindsUncompress)/sizeof(struct BINDVARIABLE), 0, 0 };
+	       0, oraBindsUncompress, NO_ORACLE_DEFINES };
 
 	SetSessionAction(oraAllInOne, "GUNZIP");
 	PrepareStmtAndBind(oraAllInOne, &oraStmtUncompress);
@@ -166,7 +168,8 @@ void SubmitCompressJob(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int
 		{ 0, SQLT_STR, ":directory",           pDirectory,          ORA_IDENTIFIER_SIZE + 1   },
 		{ 0, SQLT_INT, ":compression_level",   &vCompressionLevel,  sizeof(vCompressionLevel) },
 		{ 0, SQLT_STR, ":original_filename"  , pOriginalFileName,   MAX_FMT_SIZE              },
-		{ 0, SQLT_STR, ":compressed_filename", pCompressedFileName, MAX_FMT_SIZE              }
+		{ 0, SQLT_STR, ":compressed_filename", pCompressedFileName, MAX_FMT_SIZE              },
+		{ 0 }
 	};
 
 	struct ORACLESTATEMENT oraStmtCompress = { "\
@@ -230,7 +233,7 @@ BEGIN\
 END;\
 ');\
 END;",
-	       0, oraBindsCompress, sizeof(oraBindsCompress)/sizeof(struct BINDVARIABLE), 0, 0 };
+	       0, oraBindsCompress, NO_ORACLE_DEFINES };
 
 	vCompressionLevel = compressionLevel;
 
@@ -253,7 +256,8 @@ void SubmitUncompressJob(struct ORACLEALLINONE *oraAllInOne, char* pDirectory,
 		{ 0, SQLT_STR, ":job_name",              vJobName,              ORA_IDENTIFIER_SIZE + 1 },
 		{ 0, SQLT_STR, ":directory",             pDirectory,            ORA_IDENTIFIER_SIZE + 1 },
 		{ 0, SQLT_STR, ":original_filename"  ,   pOriginalFileName,     MAX_FMT_SIZE            },
-		{ 0, SQLT_STR, ":uncompressed_filename", pUncompressedFileName, MAX_FMT_SIZE            }
+		{ 0, SQLT_STR, ":uncompressed_filename", pUncompressedFileName, MAX_FMT_SIZE            },
+		{ 0 }
 	};
 
 	struct ORACLESTATEMENT oraStmtUncompress = { "\
@@ -309,7 +313,7 @@ BEGIN\
 END;\
 ');\
 END;",
-	       0, oraBindsUncompress, sizeof(oraBindsUncompress)/sizeof(struct BINDVARIABLE), 0, 0 };
+	       0, oraBindsUncompress, NO_ORACLE_DEFINES };
 
 	PrepareStmtAndBind(oraAllInOne, &oraStmtUncompress);
 

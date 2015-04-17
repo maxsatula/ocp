@@ -39,7 +39,8 @@ void LsDir(struct ORACLEALLINONE *oraAllInOne)
 		{ 0, SQLT_STR, vDirectory,     sizeof(vDirectory)-1,     0 },
 		{ 0, SQLT_STR, vDirectoryPath, sizeof(vDirectoryPath)-1, 0 },
 		{ 0, SQLT_STR, vGrantable1,    sizeof(vGrantable1)-1,    0 },
-		{ 0, SQLT_STR, vGrantable2,    sizeof(vGrantable2)-1,    0 }
+		{ 0, SQLT_STR, vGrantable2,    sizeof(vGrantable2)-1,    0 },
+		{ 0 }
 	};
 
 	struct ORACLESTATEMENT oraStmtLsDir = { "\
@@ -58,7 +59,7 @@ SELECT d.directory_name,\
           AND d.owner = pr.table_schema\
           AND pw.grantee = USER\
           AND pw.privilege = 'WRITE'",
-	       0, 0, 0, oraDefinesLsDir, sizeof(oraDefinesLsDir)/sizeof(struct ORACLEDEFINE) };
+	       0, NO_BIND_VARIABLES, oraDefinesLsDir };
 
 	SetSessionAction(oraAllInOne, "LSDIR");
 	PrepareStmtAndBind(oraAllInOne, &oraStmtLsDir);

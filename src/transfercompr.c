@@ -56,7 +56,8 @@ void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDire
 		{ 0, SQLT_INT,  ":compression_level", &vCompressionLevel, sizeof(vCompressionLevel) },
 		{ 0, SQLT_STR,  ":filename",          pRemoteFile,        MAX_FMT_SIZE              },
 		{ 0, SQLT_BLOB, ":blob",              &oraAllInOne->blob, sizeof(oraAllInOne->blob) },
-		{ 0, SQLT_INT,  ":skipbytes",         &vSkipBytes,        sizeof(vSkipBytes)        }
+		{ 0, SQLT_INT,  ":skipbytes",         &vSkipBytes,        sizeof(vSkipBytes)        },
+		{ 0 }
 	};
 
 	struct ORACLESTATEMENT oraStmtDownload = { "\
@@ -97,7 +98,7 @@ BEGIN\
 	UTL_FILE.FCLOSE(f_handle);\
 END;\
 ",
-	       0, oraBindsDownload, sizeof(oraBindsDownload)/sizeof(struct BINDVARIABLE), 0, 0 };
+	       0, oraBindsDownload, NO_ORACLE_DEFINES };
 
 	vCompressionLevel = compressionLevel;
 	isStdUsed = !strcmp(pLocalFile, "-");
@@ -254,7 +255,8 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
 		{ 0, SQLT_STR,  ":directory", pDirectory,         ORA_IDENTIFIER_SIZE + 1   },
 		{ 0, SQLT_STR,  ":filename",  pRemoteFile,        MAX_FMT_SIZE              },
 		{ 0, SQLT_STR,  ":openmode",  vOpenMode,          sizeof(vOpenMode)         },
-		{ 0, SQLT_BLOB, ":blob",      &oraAllInOne->blob, sizeof(oraAllInOne->blob) }
+		{ 0, SQLT_BLOB, ":blob",      &oraAllInOne->blob, sizeof(oraAllInOne->blob) },
+		{ 0 }
 	};
 
 	struct ORACLESTATEMENT oraStmtUpload = { "\
@@ -278,7 +280,7 @@ BEGIN\
 	UTL_COMPRESS.LZ_UNCOMPRESS_CLOSE(c_handle);\
 END;\
 ",
-	       0, oraBindsUpload, sizeof(oraBindsUpload)/sizeof(struct BINDVARIABLE), 0, 0 };
+	       0, oraBindsUpload, NO_ORACLE_DEFINES };
 
 	isStdUsed = !strcmp(pLocalFile, "-");
 	if (isStdUsed)

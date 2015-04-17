@@ -1,3 +1,7 @@
+2015-04-17  Max Satula <maksym.satula@gmail.com>
+
+* Some code refactoring
+
 2015-04-16  Max Satula <maksym.satula@gmail.com>
 
 * If destination filename omitted, the source filename is used.

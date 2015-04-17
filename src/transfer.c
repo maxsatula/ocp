@@ -69,7 +69,8 @@ void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
 		{ 0, SQLT_STR, ":openmode",  vOpenMode,   sizeof(vOpenMode)       },
 		{ 0, SQLT_INT, ":skipbytes", &vSkipBytes, sizeof(vSkipBytes)      },
 		{ 0, SQLT_INT, ":fhandle1",  &vFHandle1,  sizeof(vFHandle1)       },
-		{ 0, SQLT_INT, ":fhandle2",  &vFHandle2,  sizeof(vFHandle2)       }
+		{ 0, SQLT_INT, ":fhandle2",  &vFHandle2,  sizeof(vFHandle2)       },
+		{ 0 }
 	};
 
 	struct ORACLESTATEMENT oraStmtOpen = { "\
@@ -93,12 +94,13 @@ begin \
   :fhandle1 := handle.id; \
   :fhandle2 := handle.datatype; \
 end;",
-	       0, bindVariablesOpen, sizeof(bindVariablesOpen)/sizeof(struct BINDVARIABLE), 0, 0 };
+	       0, bindVariablesOpen, NO_ORACLE_DEFINES };
 
 	struct BINDVARIABLE bindVariablesClose[] =
 	{
 		{ 0, SQLT_INT, ":fhandle1", &vFHandle1, sizeof(vFHandle1) },
-		{ 0, SQLT_INT, ":fhandle2", &vFHandle2, sizeof(vFHandle2) }
+		{ 0, SQLT_INT, ":fhandle2", &vFHandle2, sizeof(vFHandle2) },
+		{ 0 }
 	};
 
 	struct ORACLESTATEMENT oraStmtClose = { "\
@@ -109,14 +111,15 @@ begin \
   handle.datatype := :fhandle2; \
   utl_file.fclose(handle); \
 end;",
-	       0, bindVariablesClose, sizeof(bindVariablesClose)/sizeof(struct BINDVARIABLE), 0, 0 };
+	       0, bindVariablesClose, NO_ORACLE_DEFINES };
 
 	struct BINDVARIABLE bindVariablesRead[] =
 	{
 		{ 0, SQLT_BIN, ":buffer",   vBuffer,    sizeof(vBuffer)   },
 		{ 0, SQLT_INT, ":size",     &vSize,     sizeof(vSize)     },
 		{ 0, SQLT_INT, ":fhandle1", &vFHandle1, sizeof(vFHandle1) },
-		{ 0, SQLT_INT, ":fhandle2", &vFHandle2, sizeof(vFHandle2) }
+		{ 0, SQLT_INT, ":fhandle2", &vFHandle2, sizeof(vFHandle2) },
+		{ 0 }
 	};
 
 	struct ORACLESTATEMENT oraStmtRead = { "\
@@ -131,13 +134,14 @@ exception \
   when no_data_found then \
     :size := 0; \
 end;",
-	       0, bindVariablesRead, sizeof(bindVariablesRead)/sizeof(struct BINDVARIABLE), 0, 0 };
+	       0, bindVariablesRead, NO_ORACLE_DEFINES };
 
 	struct BINDVARIABLE bindVariablesWrite[] =
 	{
 		{ 0, SQLT_BIN, ":buffer",   vBuffer,    sizeof(vBuffer)   },
 		{ 0, SQLT_INT, ":fhandle1", &vFHandle1, sizeof(vFHandle1) },
-		{ 0, SQLT_INT, ":fhandle2", &vFHandle2, sizeof(vFHandle2) }
+		{ 0, SQLT_INT, ":fhandle2", &vFHandle2, sizeof(vFHandle2) },
+		{ 0 }
 	};
 
 	struct ORACLESTATEMENT oraStmtWrite = { "\
@@ -148,7 +152,7 @@ begin \
   handle.datatype := :fhandle2; \
   utl_file.put_raw(handle, :buffer); \
 end;",
-	       0, bindVariablesWrite, sizeof(bindVariablesWrite)/sizeof(struct BINDVARIABLE), 0, 0 };
+	       0, bindVariablesWrite, NO_ORACLE_DEFINES };
 
 	isStdUsed = !strcmp(pLocalFile, "-");
 	if (isStdUsed)

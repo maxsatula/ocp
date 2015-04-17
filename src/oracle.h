@@ -50,9 +50,7 @@ struct ORACLESTATEMENT
 	const char* sql;
 	OCIStmt *stmthp;
 	struct BINDVARIABLE *bindVariables;
-	int bindVarsCount;
 	struct ORACLEDEFINE *oraDefines;
-	int oraDefineCount;
 };
 
 struct ORACLESIMPLESQL
@@ -71,6 +69,9 @@ struct ORACLEALLINONE
 	struct ORACLESTATEMENT *currentStmt;
 	OCILobLocator *blob;
 };
+
+extern struct BINDVARIABLE NO_BIND_VARIABLES[];
+extern struct ORACLEDEFINE NO_ORACLE_DEFINES[];
 
 void PrepareStmtAndBind(struct ORACLEALLINONE *oraAllInOne, struct ORACLESTATEMENT *oracleStatement);
 

@@ -32,7 +32,8 @@ void GetOracleFileAttr(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, cha
 		{ 0, SQLT_STR, ":directory", pDirectory,            ORA_IDENTIFIER_SIZE + 1      },
 		{ 0, SQLT_STR, ":filename",  pFileName,             MAX_FMT_SIZE                 },
 		{ 0, SQLT_INT, ":length",    &oraFileAttr->length,  sizeof(oraFileAttr->length)  },
-		{ 0, SQLT_INT, ":exists",    &oraFileAttr->bExists, sizeof(oraFileAttr->bExists) }
+		{ 0, SQLT_INT, ":exists",    &oraFileAttr->bExists, sizeof(oraFileAttr->bExists) },
+		{ 0 }
 	};
 
 	struct ORACLESTATEMENT oraStmtFattr = { "\
@@ -49,7 +50,7 @@ begin \
   end if; \
   :exists := case when exists_ then 1 else 0 end; \
 end;",
-	       0, bindVariablesFattr, sizeof(bindVariablesFattr)/sizeof(struct BINDVARIABLE), 0, 0 };
+	       0, bindVariablesFattr, NO_ORACLE_DEFINES };
 
         PrepareStmtAndBind(oraAllInOne, &oraStmtFattr);
 
