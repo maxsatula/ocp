@@ -46,6 +46,8 @@ struct PROGRAM_OPTIONS
 	int isKeepPartial;
 	enum TRANSFER_MODE transferMode;
 	const char* connectionString;
+
+	int isStdUsed;
 };
 
 void ExitWithUsage(poptContext* poptcon)
@@ -183,6 +185,7 @@ SELECT t.file_name,\
 	programOptions.isKeepPartial = 0;
 	programOptions.transferMode = TRANSFER_MODE_FAIL;
 	programOptions.connectionString = 0;
+	programOptions.isStdUsed = 0;
 
 	poptcon = poptGetContext(NULL, argc, argv, options, 0);
 	while ((rc = poptGetNextOpt(poptcon)) >= 0)
@@ -265,10 +268,6 @@ SELECT t.file_name,\
 	if (programOptions.transferMode == TRANSFER_MODE_RESUME)
 		programOptions.isKeepPartial = 1;
 
-#ifdef DEBUG
-	printf("Database connection: %s@%s\n", connectionString, dbconptr);
-#endif
-
 	switch (programOptions.programAction)
 	{
 	case ACTION_READ:
@@ -322,7 +321,11 @@ SELECT t.file_name,\
 			ExitWithUsage(&poptcon);
 		}
 
+		if (!strcmp(vLocalFile, "-"))
+			programOptions.isStdUsed = 1;
+
 		if (programOptions.programAction == ACTION_READ
+		    && !programOptions.isStdUsed
 		    && (stat(vLocalFile, &fileStat) == 0)
 		    && fileStat.st_mode & S_IFDIR)
 		{
@@ -336,23 +339,13 @@ SELECT t.file_name,\
 		}
 
 		if (programOptions.programAction == ACTION_WRITE
+		    && !programOptions.isStdUsed
 		    && (strlen(vRemoteFile) == 0))
 		{
 			strcpy(vRemoteFile, basename(vLocalFile));
 		}
 
-#ifdef DEBUG
-		printf("Copying %s Oracle. Local file %s, remote file %s, directory %s\n",
-			   programOptions.programAction == ACTION_READ ? "FROM" : "TO", vLocalFile, vRemoteFile, vDirectory);
-		if (programOptions.compressionLevel)
-			printf("On-the-fly compression is on, level %d...\n", programOptions.compressionLevel);
-#endif
 		break;
-#ifdef DEBUG
-	case ACTION_LSDIR:
-		printf("Listing directories...\n");
-		break;
-#endif
 	case ACTION_LS:
 		strncpy(vDirectory, programOptions.lsDirectoryName, sizeof(vDirectory));	
 		if (vDirectory[sizeof(vDirectory) - 1])
@@ -387,18 +380,9 @@ SELECT t.file_name,\
 			sqlLs[strlen(sqlLs)-4] = ')';
 			sqlLs[strlen(sqlLs)-3] = '\0';
 		}
-
-#ifdef DEBUG
-		printf("Listing files in directory %s...\n", vDirectory);
-		printf("SQL: %s\n", sqlLs);
-#endif
 		break;
 	case ACTION_RM:
 		SplitToDirectoryAndFileName(&poptcon, vDirectory, vRemoteFile);
-
-#ifdef DEBUG
-		printf("Removing file %s from directory %s...\n", vRemoteFile, vDirectory);
-#endif
 		break;
 	case ACTION_GZIP:
 		SplitToDirectoryAndFileName(&poptcon, vDirectory, vRemoteFile);
@@ -409,11 +393,6 @@ SELECT t.file_name,\
 		}
 		strcpy(vLocalFile, vRemoteFile);
 		strcat(vLocalFile, ".gz");
-#ifdef DEBUG
-		printf("Compressing file, compression level %d%s...\n",
-			programOptions.compressionLevel,
-			programOptions.isBackground ? ", in background" : "");
-#endif
 		break;
 	case ACTION_GUNZIP:
 		SplitToDirectoryAndFileName(&poptcon, vDirectory, vRemoteFile);
@@ -424,10 +403,6 @@ SELECT t.file_name,\
 		}
 		strcpy(vLocalFile, vRemoteFile);
 		vLocalFile[strlen(vRemoteFile) - 3] = '\0';
-#ifdef DEBUG
-		printf("Decompressing file%s...\n",
-			programOptions.isBackground ? ", in background" : "");
-#endif
 		break;
 	}
 
@@ -449,7 +424,7 @@ SELECT t.file_name,\
 	switch (programOptions.programAction)
 	{
 	case ACTION_READ:
-		if (access(vLocalFile, F_OK) != -1)
+		if (!programOptions.isStdUsed && access(vLocalFile, F_OK) != -1)
 			ConfirmOverwrite(&oraAllInOne, &programOptions, vLocalFile);
 		if (programOptions.compressionLevel > 0)
 			DownloadFileWithCompression(&oraAllInOne, vDirectory, programOptions.compressionLevel, vRemoteFile, vLocalFile, programOptions.isKeepPartial, programOptions.transferMode == TRANSFER_MODE_RESUME);

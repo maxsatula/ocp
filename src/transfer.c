@@ -46,6 +46,7 @@ void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
 	ub4 vFHandle1;
 	ub4 vFHandle2;
 	int showProgress;
+	int isStdUsed;
 	off_t cnt;
 	off_t sourceSize;
 	struct stat fileStat;
@@ -149,6 +150,14 @@ begin \
 end;",
 	       0, bindVariablesWrite, sizeof(bindVariablesWrite)/sizeof(struct BINDVARIABLE), 0, 0 };
 
+	isStdUsed = !strcmp(pLocalFile, "-");
+	if (isStdUsed)
+	{
+		isResume = 0;
+		if (readingDirection)
+			isKeepPartial = 1;
+	}
+
 	cnt = 0;
 	vSkipBytes = 0;
 
@@ -181,7 +190,7 @@ end;",
 	ReleaseStmt(oraAllInOne);
 
 	showProgress = 1;
-	if (!isatty(STDOUT_FILENO))
+	if (!isatty(STDOUT_FILENO) || isStdUsed)
 		showProgress = 0;
 
 	if (showProgress)
@@ -202,7 +211,7 @@ end;",
 
 	PrepareStmtAndBind(oraAllInOne, readingDirection ? &oraStmtRead : &oraStmtWrite);
 
-	if ((fp = fopen(pLocalFile, readingDirection ? (isResume ? "ab" : "wb") : "rb")) == NULL)
+	if (!isStdUsed && (fp = fopen(pLocalFile, readingDirection ? (isResume ? "ab" : "wb") : "rb")) == NULL)
 	{
 		ExitWithError(oraAllInOne, -1, ERROR_OS, "Error opening a local %s file for %s\n",
 					  readingDirection ? "destination" : "source",
@@ -221,6 +230,9 @@ end;",
 		ExitWithError(oraAllInOne, 4, ERROR_NONE, 0);
 	}
 
+	if (isStdUsed)
+		fp = readingDirection ? stdout : stdin;
+
 	if (readingDirection)
 	{
 		do
@@ -228,7 +240,8 @@ end;",
 			vSize = sizeof(vBuffer);
 			if (ExecuteStmt(oraAllInOne))
 			{
-				fclose(fp);
+				if (!isStdUsed)
+					fclose(fp);
 				ExitWithError(oraAllInOne, -1, ERROR_OCI, "Failed execution of %s\n",
 							  oraAllInOne->currentStmt->sql);
 				if (!isKeepPartial)
@@ -243,7 +256,8 @@ end;",
 				fwrite(vBuffer, sizeof(unsigned char), vSize, fp);
 				if (ferror(fp))
 				{
-					fclose(fp);
+					if (!isStdUsed)
+						fclose(fp);
 					ExitWithError(oraAllInOne, -1, ERROR_OS, "Error writing to a local file\n");
 					if (!isKeepPartial)
 					{
@@ -272,7 +286,8 @@ end;",
 		{
 			if (ferror(fp))
 			{
-				fclose(fp);
+				if (!isStdUsed)
+					fclose(fp);
 				ExitWithError(oraAllInOne, -1, ERROR_OS, "Error reading from a local file\n");
 				if (!isKeepPartial)
 				{
@@ -291,7 +306,8 @@ end;",
 							  ":buffer", strlen(":buffer"),
 							  vBuffer, vActualSize, SQLT_BIN, 0, 0, 0, 0, 0, OCI_DEFAULT))
 			{
-				fclose(fp);
+				if (!isStdUsed)
+					fclose(fp);
 				ExitWithError(oraAllInOne, -1, ERROR_OCI, "Failed to bind :buffer\n");
 				if (!isKeepPartial)
 				{
@@ -308,7 +324,8 @@ end;",
 
 			if (ExecuteStmt(oraAllInOne))
 			{
-				fclose(fp);
+				if (!isStdUsed)
+					fclose(fp);
 				OCIHandleFree(ociBind, OCI_HTYPE_BIND);
 				ExitWithError(oraAllInOne, -1, ERROR_OCI, "Failed execution of %s\n",
 							  oraAllInOne->currentStmt->sql);
@@ -331,7 +348,8 @@ end;",
 
 	if (showProgress)
 		stop_progress_meter();
-	fclose(fp);
+	if (!isStdUsed)
+		fclose(fp);
 	ReleaseStmt(oraAllInOne);
 
 	PrepareStmtAndBind(oraAllInOne, &oraStmtClose);

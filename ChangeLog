@@ -2,6 +2,9 @@
 
 * If destination filename omitted, the source filename is used.
 * Added missing #include
+* When "-" is specified as a file name, it means STDIN/STDOUT
+* Source code cleanup
+* Fixed set MODULE/ACTION error when wallet is not used.
 
 2015-04-12  Max Satula <maksym.satula@gmail.com>
 

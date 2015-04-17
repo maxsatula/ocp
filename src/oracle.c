@@ -196,6 +196,7 @@ void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
                  const char* module)
 {
 	sword result;
+	ub4 sessionSize;
 
 	if (OCIEnvCreate(&oraAllInOne->envhp, (ub4)OCI_DEFAULT,
 					(void  *)0, (void  * (*)(void  *, size_t))0,
@@ -229,6 +230,9 @@ void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
 			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to login to a database\n");
 			/* 3 - Failed to login to a database */
 		}
+		OCIAttrGet(oraAllInOne->svchp, OCI_HTYPE_SVCCTX,
+		           &oraAllInOne->usrhp, &sessionSize, OCI_ATTR_SESSION,
+		           oraAllInOne->errhp);
 	}
 	else
 	{

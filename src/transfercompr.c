@@ -45,6 +45,7 @@ void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDire
 	z_stream zStrm;
 	unsigned char zOut[ORA_BLOB_BUFFER_SIZE];
 	int showProgress;
+	int isStdUsed;
 	off_t cnt;
 	off_t sourceSize;
         struct stat fileStat;
@@ -99,6 +100,12 @@ END;\
 	       0, oraBindsDownload, sizeof(oraBindsDownload)/sizeof(struct BINDVARIABLE), 0, 0 };
 
 	vCompressionLevel = compressionLevel;
+	isStdUsed = !strcmp(pLocalFile, "-");
+	if (isStdUsed)
+	{
+		isResume = 0;
+		isKeepPartial = 1;
+	}
 
 	SetSessionAction(oraAllInOne, "GZIP_AND_DOWNLOAD: GZIP");
 	if (OCIDescriptorAlloc(oraAllInOne->envhp, (void**)&oraAllInOne->blob, OCI_DTYPE_LOB, 0, 0))
@@ -122,7 +129,7 @@ END;\
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to compress file in oracle directory\n");
 
 	showProgress = 1;
-	if (!isatty(STDOUT_FILENO))
+	if (!isatty(STDOUT_FILENO) || isStdUsed)
 		showProgress = 0;
 	if (showProgress)
 	{
@@ -132,10 +139,12 @@ END;\
 	}
 
 	SetSessionAction(oraAllInOne, "GZIP_AND_DOWNLOAD: DOWNLOAD");
-	if ((fp = fopen(pLocalFile, isResume ? "ab" : "wb")) == NULL)
+	if (!isStdUsed && (fp = fopen(pLocalFile, isResume ? "ab" : "wb")) == NULL)
 	{
 		ExitWithError(oraAllInOne, 4, ERROR_OS, "Error opening a local file for writing\n");
 	}
+	if (isStdUsed)
+		fp = stdout;
 
 	zStrm.zalloc = Z_NULL;
 	zStrm.zfree = Z_NULL;
@@ -145,7 +154,8 @@ END;\
 	zRet = inflateInit2(&zStrm, 16+MAX_WBITS);
 	if (zRet != Z_OK)
 	{
-		fclose(fp);
+		if (!isStdUsed)
+			fclose(fp);
 		ExitWithError(oraAllInOne, 5, ERROR_NONE, "ZLIB initialization failed\n");
 	}
 
@@ -168,7 +178,8 @@ END;\
 			case Z_DATA_ERROR:
 			case Z_MEM_ERROR:
 				(void)inflateEnd(&zStrm);
-				fclose(fp);
+				if (!isStdUsed)
+					fclose(fp);
 				ExitWithError(oraAllInOne, 5, ERROR_NONE, "ZLIB inflate failed: %d, size %d\n", zRet, vSize);
 			}
 
@@ -176,7 +187,8 @@ END;\
 			if (ferror(fp))
 			{
 				(void)inflateEnd(&zStrm);
-				fclose(fp);
+				if (!isStdUsed)
+					fclose(fp);
 				ExitWithError(oraAllInOne, -1, ERROR_OS, "Error writing to a local file\n");
 				if (!isKeepPartial)
 				{
@@ -196,7 +208,8 @@ END;\
 	if (showProgress)
 		stop_progress_meter();
 	inflateEnd(&zStrm);
-	fclose(fp);
+	if (!isStdUsed)
+		fclose(fp);
 
 	if (result != OCI_SUCCESS)
 	{
@@ -229,6 +242,7 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
 	z_stream zStrm;
 	unsigned char zIn[ORA_BLOB_BUFFER_SIZE];
 	int showProgress;
+	int isStdUsed;
 	off_t cnt;
 	off_t sourceSize;
 	struct stat fileStat;
@@ -266,6 +280,10 @@ END;\
 ",
 	       0, oraBindsUpload, sizeof(oraBindsUpload)/sizeof(struct BINDVARIABLE), 0, 0 };
 
+	isStdUsed = !strcmp(pLocalFile, "-");
+	if (isStdUsed)
+		isResume = 0;
+
 	SetSessionAction(oraAllInOne, "UPLOAD_AND_GUNZIP: UPLOAD");
 	if (OCIDescriptorAlloc(oraAllInOne->envhp, (void**)&oraAllInOne->blob, OCI_DTYPE_LOB, 0, 0))
 	{
@@ -283,7 +301,7 @@ END;\
 	piece = OCI_FIRST_PIECE;
 
 	showProgress = 1;
-	if (!isatty(STDOUT_FILENO))
+	if (!isatty(STDOUT_FILENO) || isStdUsed)
 		showProgress = 0;
 	cnt = 0;
 	if (isResume)
@@ -303,10 +321,12 @@ END;\
 	}
 
 
-	if ((fp = fopen(pLocalFile, "rb")) == NULL)
+	if (!isStdUsed && (fp = fopen(pLocalFile, "rb")) == NULL)
 	{
 		ExitWithError(oraAllInOne, 4, ERROR_OS, "Error opening a local file for reading\n");
 	}
+	if (isStdUsed)
+		fp = stdin;
 
 	if (cnt > 0)
 	{
@@ -324,7 +344,8 @@ END;\
 	zRet = deflateInit2(&zStrm, compressionLevel ? compressionLevel : Z_DEFAULT_COMPRESSION, Z_DEFLATED, 16+MAX_WBITS, 8, Z_DEFAULT_STRATEGY);
 	if (zRet != Z_OK)
 	{
-		fclose(fp);
+		if (!isStdUsed)
+			fclose(fp);
 		ExitWithError(oraAllInOne, 5, ERROR_NONE, "ZLIB initialization failed\n");
 	}
 
@@ -335,7 +356,8 @@ END;\
 		if (ferror(fp))
 		{
 			(void)deflateEnd(&zStrm);
-			fclose(fp);
+			if (!isStdUsed)
+				fclose(fp);
 			ExitWithError(oraAllInOne, 4, ERROR_OS, "Error reading from a local file\n");
 		}
 
@@ -350,7 +372,8 @@ END;\
 			if (zRet != Z_OK && zRet != Z_STREAM_END && zRet != Z_BUF_ERROR)
 			{
 				(void)deflateEnd(&zStrm);
-				fclose(fp);
+				if (!isStdUsed)
+					fclose(fp);
 				ExitWithError(oraAllInOne, 5, ERROR_NONE, "ZLIB deflate failed: %d, size %d\n", zRet, zStrm.avail_in);
 			}
 
@@ -364,7 +387,8 @@ END;\
 			if (result != OCI_NEED_DATA && result)
 			{
 				(void)deflateEnd(&zStrm);
-				fclose(fp);
+				if (!isStdUsed)
+					fclose(fp);
 				ExitWithError(oraAllInOne, 4, ERROR_OCI, "Error writing to BLOB\n");
 			}
 			if (piece == OCI_FIRST_PIECE)
@@ -376,7 +400,8 @@ END;\
 	if (showProgress)
 		stop_progress_meter();
 	deflateEnd(&zStrm);
-	fclose(fp);
+	if (!isStdUsed)
+		fclose(fp);
 
 	/*vSize = 0;
 	if (OCILobWrite2(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob, &vSize, 0, 1, blobBuffer, 0, OCI_LAST_PIECE, 0, 0, 0, 0))
