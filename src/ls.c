@@ -56,9 +56,6 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 	SetSessionAction(oraAllInOne, "LS");
 	PrepareStmtAndBind(oraAllInOne, &oraStmtLs);
 
-	if (ExecuteStmt(oraAllInOne))
-		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to list files in oracle directory\n");
-
 	printf("Contents of %s directory\n\
 %-40s %-12s %s\n\
 ---------------------------------------- ------------ -------------------\n",
@@ -66,7 +63,8 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 
 	i = 0;
 	totalBytes = 0;
-	do
+	ociResult = ExecuteStmt(oraAllInOne);
+	while (ociResult == OCI_SUCCESS)
 	{
 		printf("%-40s %12ld %02d/%02d/%d %02d:%02d:%02d\n",
 			   vFileName,
@@ -83,13 +81,13 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 		ociResult = OCIStmtFetch2(oraStmtLs.stmthp, oraAllInOne->errhp, 1,
 								  OCI_FETCH_NEXT, 1, OCI_DEFAULT);
 	}
-	while (ociResult == OCI_SUCCESS);
 
 	if (ociResult != OCI_NO_DATA)
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to list files in oracle directory\n");
 
-	printf("---------------------------------------- ------------ -------------------\n\
-%5d File(s) %39ld\n", i, totalBytes);
+	if (i)
+		printf("---------------------------------------- ------------ -------------------\n");
+	printf("%5d File(s) %39ld\n", i, totalBytes);
 
 	ReleaseStmt(oraAllInOne);	
 	SetSessionAction(oraAllInOne, 0);

@@ -1,3 +1,7 @@
+2015-04-20  Max Satula <maksym.satula@gmail.com>
+
+* Fixed "ORA-01403: no data found" bug when no matching files found for --ls
+
 2015-04-17  Max Satula <maksym.satula@gmail.com>
 
 * Some code refactoring
