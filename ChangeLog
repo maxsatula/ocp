@@ -3,6 +3,7 @@
 * Added support of multiple database sessions, e.g. worker session
   and longops monitoring session
 * Implemented progress meter for long-running PL/SQL blocks
+* Fixed portability bug in --ls
 
 2015-04-20  Max Satula <maksym.satula@gmail.com>
 

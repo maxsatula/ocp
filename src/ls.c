@@ -66,9 +66,9 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 	ociResult = ExecuteStmt(oraAllInOne);
 	while (ociResult == OCI_SUCCESS)
 	{
-		printf("%-40s %12ld %02d/%02d/%d %02d:%02d:%02d\n",
+		printf("%-40s %12lld %02d/%02d/%d %02d:%02d:%02d\n",
 			   vFileName,
-			   vBytes,
+			   (long long)vBytes,
 		       (int)vLastModified[2],
 		       (int)vLastModified[3],
 			   ((int)vLastModified[0]-100) * 100 + ((int)vLastModified[1] - 100),
