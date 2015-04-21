@@ -22,8 +22,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #endif
 
 #include <stdio.h>
+#include <unistd.h>
 #include <oci.h>
 #include "oracle.h"
+#include "longopsmeter.h"
 #include "ocp.h"
 
 
@@ -31,6 +33,8 @@ void Compress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compress
               char* pOriginalFileName, char* pCompressedFileName)
 {
 	ub4 vCompressionLevel;
+	sword ociResult;
+	int showProgress;
 
 	struct BINDVARIABLE oraBindsCompress[] =
 	{
@@ -49,9 +53,23 @@ DECLARE\
 	blob_buffer BLOB;\
 	actual_size NUMBER;\
 	pos BINARY_INTEGER;\
-	blobsize BINARY_INTEGER; \
+	blobsize BINARY_INTEGER;\
+	rindex BINARY_INTEGER;\
+	slno BINARY_INTEGER;\
+	target NUMBER;\
+	exists_ BOOLEAN;\
+	file_length NUMBER;\
+	blocksize NUMBER; \
 BEGIN\
+	utl_file.fgetattr(:directory, :original_filename, exists_, file_length, blocksize);\
+	rindex := dbms_application_info.set_session_longops_nohint;\
+	select object_id\
+	  into target\
+	  from all_objects\
+	 where object_type = 'DIRECTORY'\
+	       and object_name = :directory;\
 	f_handle := UTL_FILE.FOPEN(:directory, :original_filename, 'rb');\
+	pos := 0;\
 	DBMS_LOB.CREATETEMPORARY(blob_buffer, TRUE, DBMS_LOB.CALL);\
 	IF :compression_level > 0 THEN\
 		c_handle := UTL_COMPRESS.LZ_COMPRESS_OPEN(blob_buffer, :compression_level);\
@@ -62,6 +80,8 @@ BEGIN\
 		BEGIN\
 			UTL_FILE.GET_RAW(f_handle, raw_buffer, 16384);\
 			UTL_COMPRESS.LZ_COMPRESS_ADD(c_handle, blob_buffer, raw_buffer);\
+			pos := pos + utl_raw.length(raw_buffer);\
+			dbms_application_info.set_session_longops(rindex, slno, 'GZIP', target, 0, pos, file_length, :directory || ':' || :original_filename, 'bytes');\
 		EXCEPTION\
 			WHEN NO_DATA_FOUND THEN\
 				EXIT;\
@@ -73,24 +93,36 @@ BEGIN\
 	f_handle := UTL_FILE.FOPEN(:directory, :compressed_filename, 'wb');\
 	pos := 0;\
 	blobsize := DBMS_LOB.GETLENGTH(blob_buffer);\
+	rindex := dbms_application_info.set_session_longops_nohint;\
 	WHILE pos < blobsize LOOP\
 		actual_size := LEAST(blobsize - pos, 16384);\
 		DBMS_LOB.READ(blob_buffer, actual_size, pos + 1, raw_buffer);\
 		UTL_FILE.PUT_RAW(f_handle, raw_buffer);\
 		pos := pos + actual_size;\
+		dbms_application_info.set_session_longops(rindex, slno, 'WRITE LOB TO FILE', target, 0, pos, blobsize, :directory || ':' || :original_filename, 'bytes');\
 	END LOOP;\
 	DBMS_LOB.FREETEMPORARY(blob_buffer);\
 	UTL_FILE.FCLOSE(f_handle);\
 END;\
 ",
-	       0, oraBindsCompress, NO_ORACLE_DEFINES };
+		0, oraBindsCompress, NO_ORACLE_DEFINES };
 
 	vCompressionLevel = compressionLevel;
 
 	SetSessionAction(oraAllInOne, "GZIP");
-	PrepareStmtAndBind(oraAllInOne, &oraStmtCompress);
 
-	if (ExecuteStmt(oraAllInOne))
+	showProgress = 1;
+	if (!isatty(STDOUT_FILENO))
+		showProgress = 0;
+
+	if (showProgress)
+		start_longops_meter(oraAllInOne, 0, 1);
+	PrepareStmtAndBind(oraAllInOne, &oraStmtCompress);
+	ociResult = ExecuteStmt(oraAllInOne);
+	if (showProgress)
+		stop_longops_meter();
+
+	if (ociResult)
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to compress file in oracle directory\n");
 
 	ReleaseStmt(oraAllInOne);
@@ -100,6 +132,9 @@ END;\
 void Uncompress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory,
                 char* pOriginalFileName, char* pUncompressedFileName)
 {
+	sword ociResult;
+	int showProgress;
+
 	struct BINDVARIABLE oraBindsUncompress[] =
 	{
 		{ 0, SQLT_STR, ":directory",             pDirectory,            ORA_IDENTIFIER_SIZE + 1 },
@@ -113,14 +148,31 @@ DECLARE\
 	f_handle UTL_FILE.FILE_TYPE;\
 	c_handle BINARY_INTEGER;\
 	raw_buffer RAW(32767);\
-	blob_buffer BLOB; \
+	blob_buffer BLOB;\
+	pos BINARY_INTEGER;\
+	rindex BINARY_INTEGER;\
+	slno BINARY_INTEGER;\
+	target NUMBER;\
+	exists_ BOOLEAN;\
+	file_length NUMBER;\
+	blocksize NUMBER; \
 BEGIN\
+	utl_file.fgetattr(:directory, :original_filename, exists_, file_length, blocksize);\
+	rindex := dbms_application_info.set_session_longops_nohint;\
+	select object_id\
+	  into target\
+	  from all_objects\
+	 where object_type = 'DIRECTORY'\
+	       and object_name = :directory;\
 	DBMS_LOB.CREATETEMPORARY(blob_buffer, TRUE, DBMS_LOB.CALL);\
 	f_handle := UTL_FILE.FOPEN(:directory, :original_filename, 'rb');\
+	pos := 0;\
 	LOOP\
 		BEGIN\
 			UTL_FILE.GET_RAW(f_handle, raw_buffer, 16384);\
 			DBMS_LOB.WRITEAPPEND(blob_buffer, UTL_RAW.LENGTH(raw_buffer), raw_buffer);\
+			pos := pos + utl_raw.length(raw_buffer);\
+			dbms_application_info.set_session_longops(rindex, slno, 'READ LOB FROM FILE', target, 0, pos, file_length, :directory || ':' || :original_filename, 'bytes');\
 		EXCEPTION\
 			WHEN NO_DATA_FOUND THEN\
 				EXIT;\
@@ -128,12 +180,16 @@ BEGIN\
 	END LOOP;\
 	UTL_FILE.FCLOSE(f_handle);\
 \
+	rindex := dbms_application_info.set_session_longops_nohint;\
 	c_handle := UTL_COMPRESS.LZ_UNCOMPRESS_OPEN(blob_buffer);\
 	f_handle := UTL_FILE.FOPEN(:directory, :uncompressed_filename, 'wb');\
+	pos := 0;\
 	LOOP\
 		BEGIN\
 			UTL_COMPRESS.LZ_UNCOMPRESS_EXTRACT(c_handle, raw_buffer);\
 			UTL_FILE.PUT_RAW(f_handle, raw_buffer);\
+			pos := pos + utl_raw.length(raw_buffer);\
+			dbms_application_info.set_session_longops(rindex, slno, 'GUNZIP', target, 0, pos, file_length, :directory || ':' || :original_filename, 'bytes');\
 		EXCEPTION\
 			WHEN NO_DATA_FOUND THEN\
 				EXIT;\
@@ -144,12 +200,22 @@ BEGIN\
 	DBMS_LOB.FREETEMPORARY(blob_buffer);\
 END;\
 ",
-	       0, oraBindsUncompress, NO_ORACLE_DEFINES };
+		0, oraBindsUncompress, NO_ORACLE_DEFINES };
 
 	SetSessionAction(oraAllInOne, "GUNZIP");
-	PrepareStmtAndBind(oraAllInOne, &oraStmtUncompress);
 
-	if (ExecuteStmt(oraAllInOne))
+	showProgress = 1;
+	if (!isatty(STDOUT_FILENO))
+		showProgress = 0;
+
+	if (showProgress)
+		start_longops_meter(oraAllInOne, 0, 1);
+	PrepareStmtAndBind(oraAllInOne, &oraStmtUncompress);
+	ociResult = ExecuteStmt(oraAllInOne);
+	if (showProgress)
+		stop_longops_meter();
+
+	if (ociResult)
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to uncompress file in oracle directory\n");
 
 	ReleaseStmt(oraAllInOne);	
@@ -198,9 +264,23 @@ DECLARE\
 	blob_buffer BLOB;\
 	actual_size NUMBER;\
 	pos BINARY_INTEGER;\
-	blobsize BINARY_INTEGER; \
+	blobsize BINARY_INTEGER;\
+	rindex BINARY_INTEGER;\
+	slno BINARY_INTEGER;\
+	target NUMBER;\
+	exists_ BOOLEAN;\
+	file_length NUMBER;\
+	blocksize NUMBER; \
 BEGIN\
+	utl_file.fgetattr(' || safe_directory_ || ', ' || safe_original_filename_ || ', exists_, file_length, blocksize);\
+	rindex := dbms_application_info.set_session_longops_nohint;\
+	select object_id\
+	  into target\
+	  from all_objects\
+	 where object_type = ''DIRECTORY''\
+	       and object_name = ' || safe_directory_ || ';\
 	f_handle := UTL_FILE.FOPEN(' || safe_directory_ || ', ' || safe_original_filename_ || ', ''rb'');\
+	pos := 0;\
 	DBMS_LOB.CREATETEMPORARY(blob_buffer, TRUE, DBMS_LOB.CALL);\
 	' || case when :compression_level > 0 then \
 		'c_handle := UTL_COMPRESS.LZ_COMPRESS_OPEN(blob_buffer, ' || safe_compression_level_ || ');'\
@@ -211,6 +291,8 @@ BEGIN\
 		BEGIN\
 			UTL_FILE.GET_RAW(f_handle, raw_buffer, 16384);\
 			UTL_COMPRESS.LZ_COMPRESS_ADD(c_handle, blob_buffer, raw_buffer);\
+			pos := pos + utl_raw.length(raw_buffer);\
+			dbms_application_info.set_session_longops(rindex, slno, ''GZIP'', target, 0, pos, file_length, ' || safe_directory_ || ' || '':'' || ' || safe_original_filename_ || ', ''bytes'');\
 		EXCEPTION\
 			WHEN NO_DATA_FOUND THEN\
 				EXIT;\
@@ -222,11 +304,13 @@ BEGIN\
 	f_handle := UTL_FILE.FOPEN(' || safe_directory_ || ', ' || safe_compressed_filename_ || ', ''wb'');\
 	pos := 0;\
 	blobsize := DBMS_LOB.GETLENGTH(blob_buffer);\
+	rindex := dbms_application_info.set_session_longops_nohint;\
 	WHILE pos < blobsize LOOP\
 		actual_size := LEAST(blobsize - pos, 16384);\
 		DBMS_LOB.READ(blob_buffer, actual_size, pos + 1, raw_buffer);\
 		UTL_FILE.PUT_RAW(f_handle, raw_buffer);\
 		pos := pos + actual_size;\
+		dbms_application_info.set_session_longops(rindex, slno, ''WRITE LOB TO FILE'', target, 0, pos, blobsize, ' || safe_directory_ || ' || '':'' || ' || safe_original_filename_ || ', ''bytes'');\
 	END LOOP;\
 	DBMS_LOB.FREETEMPORARY(blob_buffer);\
 	UTL_FILE.FCLOSE(f_handle);\
@@ -281,14 +365,31 @@ DECLARE\
 	f_handle UTL_FILE.FILE_TYPE;\
 	c_handle BINARY_INTEGER;\
 	raw_buffer RAW(32767);\
-	blob_buffer BLOB; \
+	blob_buffer BLOB;\
+	pos BINARY_INTEGER;\
+	rindex BINARY_INTEGER;\
+	slno BINARY_INTEGER;\
+	target NUMBER;\
+	exists_ BOOLEAN;\
+	file_length NUMBER;\
+	blocksize NUMBER; \
 BEGIN\
+	utl_file.fgetattr(' || safe_directory_ || ', ' || safe_original_filename_ || ', exists_, file_length, blocksize);\
+	rindex := dbms_application_info.set_session_longops_nohint;\
+	select object_id\
+	  into target\
+	  from all_objects\
+	 where object_type = ''DIRECTORY''\
+	       and object_name = ' || safe_directory_ || ';\
 	DBMS_LOB.CREATETEMPORARY(blob_buffer, TRUE, DBMS_LOB.CALL);\
 	f_handle := UTL_FILE.FOPEN(' || safe_directory_ || ', ' || safe_original_filename_ || ', ''rb'');\
+	pos := 0;\
 	LOOP\
 		BEGIN\
 			UTL_FILE.GET_RAW(f_handle, raw_buffer, 16384);\
 			DBMS_LOB.WRITEAPPEND(blob_buffer, UTL_RAW.LENGTH(raw_buffer), raw_buffer);\
+			pos := pos + utl_raw.length(raw_buffer);\
+			dbms_application_info.set_session_longops(rindex, slno, ''READ LOB FROM FILE'', target, 0, pos, file_length, ' || safe_directory_ || ' || '':'' || ' || safe_original_filename_ || ', ''bytes'');\
 		EXCEPTION\
 			WHEN NO_DATA_FOUND THEN\
 				EXIT;\
@@ -296,12 +397,16 @@ BEGIN\
 	END LOOP;\
 	UTL_FILE.FCLOSE(f_handle);\
 \
+	rindex := dbms_application_info.set_session_longops_nohint;\
 	c_handle := UTL_COMPRESS.LZ_UNCOMPRESS_OPEN(blob_buffer);\
 	f_handle := UTL_FILE.FOPEN(' || safe_directory_ || ', ' || safe_uncompressed_filename_ || ', ''wb'');\
+	pos := 0;\
 	LOOP\
 		BEGIN\
 			UTL_COMPRESS.LZ_UNCOMPRESS_EXTRACT(c_handle, raw_buffer);\
 			UTL_FILE.PUT_RAW(f_handle, raw_buffer);\
+			pos := pos + utl_raw.length(raw_buffer);\
+			dbms_application_info.set_session_longops(rindex, slno, ''GUNZIP'', target, 0, pos, file_length, ' || safe_directory_ || ' || '':'' || ' || safe_original_filename_ || ', ''bytes'');\
 		EXCEPTION\
 			WHEN NO_DATA_FOUND THEN\
 				EXIT;\

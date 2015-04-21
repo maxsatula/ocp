@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #define MAX_FMT_SIZE 4096
 #define ORA_IDENTIFIER_SIZE 30
+#define MAX_ORA_SESSIONS 2
 
 enum ERROR_CLASS { ERROR_NONE, ERROR_OCI, ERROR_OS };
 
@@ -63,21 +64,30 @@ struct ORACLEALLINONE
 {
 	OCIEnv *envhp;
 	OCIError *errhp;
-	OCISvcCtx *svchp;
-	OCIServer *srvhp;
-	OCISession *usrhp;
-	struct ORACLESTATEMENT *currentStmt;
+	OCISvcCtx *svchp[MAX_ORA_SESSIONS];
+	OCIServer *srvhp[MAX_ORA_SESSIONS];
+	OCISession *usrhp[MAX_ORA_SESSIONS];
+	struct ORACLESTATEMENT *currentStmt[MAX_ORA_SESSIONS];
 	OCILobLocator *blob;
 };
 
 extern struct BINDVARIABLE NO_BIND_VARIABLES[];
 extern struct ORACLEDEFINE NO_ORACLE_DEFINES[];
 
+struct ORACLESESSIONID
+{
+	ub4 sid;
+	ub4 instance;
+};
+
 void PrepareStmtAndBind(struct ORACLEALLINONE *oraAllInOne, struct ORACLESTATEMENT *oracleStatement);
+void PrepareStmtAndBind2(struct ORACLEALLINONE *oraAllInOne, struct ORACLESTATEMENT *oracleStatement, int index);
 
 sword ExecuteStmt(struct ORACLEALLINONE *oraAllInOne);
+sword ExecuteStmt2(struct ORACLEALLINONE *oraAllInOne, int index);
 
 void ReleaseStmt(struct ORACLEALLINONE *oraAllInOne);
+void ReleaseStmt2(struct ORACLEALLINONE *oraAllInOne, int index);
 
 /* if exitCode == -1 then do not exit the program; just print an error message and proceed */
 void ExitWithError(struct ORACLEALLINONE *oraAllInOne, int exitCode, enum ERROR_CLASS errorClass,
@@ -87,10 +97,14 @@ void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
                  const char* userName,
                  const char* password,
                  const char* connection,
-                 const char* module);
+                 const char* module,
+                 int numberOfConnections);
 
 void SetSessionAction(struct ORACLEALLINONE *oraAllInOne, const char* action);
+void SetSessionAction2(struct ORACLEALLINONE *oraAllInOne, const char* action, int index);
 
 void ExecuteSimpleSqls(struct ORACLEALLINONE *oraAllInOne, struct ORACLESIMPLESQL *oracleSimpleSqls);
+
+void GetSessionId(struct ORACLEALLINONE *oraAllInOne, struct ORACLESESSIONID *oracleSessionId, int index);
 
 #endif

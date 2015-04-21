@@ -247,7 +247,7 @@ end;",
 				if (!isStdUsed)
 					fclose(fp);
 				ExitWithError(oraAllInOne, -1, ERROR_OCI, "Failed execution of %s\n",
-							  oraAllInOne->currentStmt->sql);
+							  oraAllInOne->currentStmt[0]->sql);
 				if (!isKeepPartial)
 				{
 					if (unlink(pLocalFile))
@@ -306,7 +306,7 @@ end;",
 				ExitWithError(oraAllInOne, 4, ERROR_NONE, 0);
 			}
 
-			if (OCIBindByName(oraAllInOne->currentStmt->stmthp, &ociBind, oraAllInOne->errhp,
+			if (OCIBindByName(oraAllInOne->currentStmt[0]->stmthp, &ociBind, oraAllInOne->errhp,
 							  ":buffer", strlen(":buffer"),
 							  vBuffer, vActualSize, SQLT_BIN, 0, 0, 0, 0, 0, OCI_DEFAULT))
 			{
@@ -332,7 +332,7 @@ end;",
 					fclose(fp);
 				OCIHandleFree(ociBind, OCI_HTYPE_BIND);
 				ExitWithError(oraAllInOne, -1, ERROR_OCI, "Failed execution of %s\n",
-							  oraAllInOne->currentStmt->sql);
+							  oraAllInOne->currentStmt[0]->sql);
 				if (!isKeepPartial)
 				{
 					PrepareStmtAndBind(oraAllInOne, &oraStmtClose);

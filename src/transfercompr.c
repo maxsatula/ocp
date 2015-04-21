@@ -36,7 +36,7 @@ void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDire
                                  int isKeepPartial, int isResume)
 {
 	FILE *fp;
-	sword result;
+	sword ociResult;
 	ub4 vCompressionLevel;
 	ub8 vSkipBytes;
 	char blobBuffer[ORA_BLOB_BUFFER_SIZE];
@@ -65,8 +65,23 @@ DECLARE\
 	f_handle UTL_FILE.FILE_TYPE;\
 	c_handle BINARY_INTEGER;\
 	raw_buffer RAW(32767);\
+	pos BINARY_INTEGER;\
+	rindex BINARY_INTEGER;\
+	slno BINARY_INTEGER;\
+	target NUMBER;\
+	exists_ BOOLEAN;\
+	file_length NUMBER;\
+	blocksize NUMBER; \
 BEGIN\
+	utl_file.fgetattr(:directory, :filename, exists_, file_length, blocksize);\
+	rindex := dbms_application_info.set_session_longops_nohint;\
+	select object_id\
+	  into target\
+	  from all_objects\
+	 where object_type = 'DIRECTORY'\
+	       and object_name = :directory;\
 	f_handle := UTL_FILE.FOPEN(:directory, :filename, 'rb');\
+	pos := 0;\
 	if :skipbytes > 0 then \
 		declare \
 			leftToSkip_ number := :skipbytes; \
@@ -75,7 +90,9 @@ BEGIN\
 			while leftToSkip_ > 0 loop \
 				size_ := least(leftToSkip_, 16384); \
 				utl_file.get_raw(f_handle, raw_buffer, size_); \
-				leftToSkip_ := leftToSkip_ - size_; \
+				leftToSkip_ := leftToSkip_ - utl_raw.length(raw_buffer); \
+				pos := pos + utl_raw.length(raw_buffer);\
+				dbms_application_info.set_session_longops(rindex, slno, 'GZIP', target, 0, pos, file_length, :directory || ':' || :filename, 'bytes');\
 			end loop; \
 		end; \
 	end if; \
@@ -89,6 +106,8 @@ BEGIN\
 		BEGIN\
 			UTL_FILE.GET_RAW(f_handle, raw_buffer, 16384);\
 			UTL_COMPRESS.LZ_COMPRESS_ADD(c_handle, :blob, raw_buffer);\
+			pos := pos + utl_raw.length(raw_buffer);\
+			dbms_application_info.set_session_longops(rindex, slno, 'GZIP', target, 0, pos, file_length, :directory || ':' || :filename, 'bytes');\
 		EXCEPTION\
 			WHEN NO_DATA_FOUND THEN\
 				EXIT;\
@@ -98,7 +117,7 @@ BEGIN\
 	UTL_FILE.FCLOSE(f_handle);\
 END;\
 ",
-	       0, oraBindsDownload, NO_ORACLE_DEFINES };
+		0, oraBindsDownload, NO_ORACLE_DEFINES };
 
 	vCompressionLevel = compressionLevel;
 	isStdUsed = !strcmp(pLocalFile, "-");
@@ -124,17 +143,24 @@ END;\
 			isResume = 0;
 	}
 
-	PrepareStmtAndBind(oraAllInOne, &oraStmtDownload);
-
-	if (ExecuteStmt(oraAllInOne))
-		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to compress file in oracle directory\n");
-
 	showProgress = 1;
 	if (!isatty(STDOUT_FILENO) || isStdUsed)
 		showProgress = 0;
+
+	if (showProgress)
+		start_longops_meter(oraAllInOne, 0, 1);
+
+	PrepareStmtAndBind(oraAllInOne, &oraStmtDownload);
+	ociResult = ExecuteStmt(oraAllInOne);
+	if (showProgress)
+		stop_longops_meter();
+
+	if (ociResult)
+		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to compress file in oracle directory\n");
+
 	if (showProgress)
 	{
-		if (OCILobGetLength2(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob, (oraub8*)&sourceSize))
+		if (OCILobGetLength2(oraAllInOne->svchp[0], oraAllInOne->errhp, oraAllInOne->blob, (oraub8*)&sourceSize))
 			ExitWithError(oraAllInOne, 4, ERROR_OCI, "Error getting BLOB length\n");
 		start_progress_meter(pRemoteFile, sourceSize, &cnt);
 	}
@@ -161,8 +187,8 @@ END;\
 	}
 
 	vSize = 0;
-	result = OCILobRead2(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob, &vSize, 0, 1, blobBuffer, ORA_BLOB_BUFFER_SIZE, OCI_FIRST_PIECE, 0, 0, 0, 0);
-	while (result == OCI_NEED_DATA || result == OCI_SUCCESS)
+	ociResult = OCILobRead2(oraAllInOne->svchp[0], oraAllInOne->errhp, oraAllInOne->blob, &vSize, 0, 1, blobBuffer, ORA_BLOB_BUFFER_SIZE, OCI_FIRST_PIECE, 0, 0, 0, 0);
+	while (ociResult == OCI_NEED_DATA || ociResult == OCI_SUCCESS)
 	{
 		cnt += vSize;
 		zStrm.avail_in = vSize;
@@ -201,9 +227,9 @@ END;\
 		}
 		while (zStrm.avail_out == 0);
 
-		if (result == OCI_SUCCESS)
+		if (ociResult == OCI_SUCCESS)
 			break;
-		result = OCILobRead2(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob, &vSize, 0, 1, blobBuffer, ORA_BLOB_BUFFER_SIZE, OCI_NEXT_PIECE, 0, 0, 0, 0);
+		ociResult = OCILobRead2(oraAllInOne->svchp[0], oraAllInOne->errhp, oraAllInOne->blob, &vSize, 0, 1, blobBuffer, ORA_BLOB_BUFFER_SIZE, OCI_NEXT_PIECE, 0, 0, 0, 0);
 	}
 
 	if (showProgress)
@@ -212,7 +238,7 @@ END;\
 	if (!isStdUsed)
 		fclose(fp);
 
-	if (result != OCI_SUCCESS)
+	if (ociResult != OCI_SUCCESS)
 	{
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Error reading BLOB\n");
 	}
@@ -220,7 +246,7 @@ END;\
 	ReleaseStmt(oraAllInOne);
 	SetSessionAction(oraAllInOne, 0);
 
-	OCILobFreeTemporary(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob);
+	OCILobFreeTemporary(oraAllInOne->svchp[0], oraAllInOne->errhp, oraAllInOne->blob);
 
 	if (OCIDescriptorFree(oraAllInOne->blob, OCI_DTYPE_LOB))
 	{
@@ -234,9 +260,10 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
                                int isKeepPartial, int isResume)
 {
 	FILE *fp;
-	sword result;
+	sword ociResult;
 	char blobBuffer[ORA_BLOB_BUFFER_SIZE];
 	oraub8 vSize;
+	ub8 vSkippedBytes;
 	char vOpenMode[3];
 	ub1 piece;
 	int zRet, zFlush;
@@ -255,6 +282,8 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
 		{ 0, SQLT_STR,  ":directory", pDirectory,         ORA_IDENTIFIER_SIZE + 1   },
 		{ 0, SQLT_STR,  ":filename",  pRemoteFile,        MAX_FMT_SIZE              },
 		{ 0, SQLT_STR,  ":openmode",  vOpenMode,          sizeof(vOpenMode)         },
+		{ 0, SQLT_INT,  ":file_size", &sourceSize,        sizeof(sourceSize)        },
+		{ 0, SQLT_INT,  ":skipped",   &vSkippedBytes,     sizeof(vSkippedBytes)     },
 		{ 0, SQLT_BLOB, ":blob",      &oraAllInOne->blob, sizeof(oraAllInOne->blob) },
 		{ 0 }
 	};
@@ -264,13 +293,26 @@ DECLARE\
 	f_handle UTL_FILE.FILE_TYPE;\
 	c_handle BINARY_INTEGER;\
 	raw_buffer RAW(32767);\
+	pos BINARY_INTEGER;\
+	rindex BINARY_INTEGER;\
+	slno BINARY_INTEGER;\
+	target NUMBER;\
 BEGIN\
+	rindex := dbms_application_info.set_session_longops_nohint;\
+	select object_id\
+	  into target\
+	  from all_objects\
+	 where object_type = 'DIRECTORY'\
+	       and object_name = :directory;\
 	c_handle := UTL_COMPRESS.LZ_UNCOMPRESS_OPEN(:blob);\
 	f_handle := UTL_FILE.FOPEN(:directory, :filename, :openmode);\
+	pos := :skipped;\
 	LOOP\
 		BEGIN\
 			UTL_COMPRESS.LZ_UNCOMPRESS_EXTRACT(c_handle, raw_buffer);\
 			UTL_FILE.PUT_RAW(f_handle, raw_buffer);\
+			pos := pos + utl_raw.length(raw_buffer);\
+			dbms_application_info.set_session_longops(rindex, slno, 'GUNZIP', target, 0, pos, :file_size, :directory || ':' || :filename, 'bytes');\
 		EXCEPTION\
 			WHEN NO_DATA_FOUND THEN\
 				EXIT;\
@@ -280,7 +322,7 @@ BEGIN\
 	UTL_COMPRESS.LZ_UNCOMPRESS_CLOSE(c_handle);\
 END;\
 ",
-	       0, oraBindsUpload, NO_ORACLE_DEFINES };
+		0, oraBindsUpload, NO_ORACLE_DEFINES };
 
 	isStdUsed = !strcmp(pLocalFile, "-");
 	if (isStdUsed)
@@ -292,11 +334,11 @@ END;\
 		ExitWithError(oraAllInOne, 4, ERROR_NONE, "Failed to allocate BLOB\n");
 	}
 
-	if (OCILobCreateTemporary(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob, OCI_DEFAULT, 0, OCI_TEMP_BLOB, TRUE/*cache*/, OCI_DURATION_SESSION))
+	if (OCILobCreateTemporary(oraAllInOne->svchp[0], oraAllInOne->errhp, oraAllInOne->blob, OCI_DEFAULT, 0, OCI_TEMP_BLOB, TRUE/*cache*/, OCI_DURATION_SESSION))
 	{
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to create temporary BLOB\n");
 	}
-	/*if (OCILobOpen(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob, OCI_LOB_READWRITE))
+	/*if (OCILobOpen(oraAllInOne->svchp[0], oraAllInOne->errhp, oraAllInOne->blob, OCI_LOB_READWRITE))
 	{
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to open temporary BLOB for write\n");
 	}*/
@@ -305,12 +347,12 @@ END;\
 	showProgress = 1;
 	if (!isatty(STDOUT_FILENO) || isStdUsed)
 		showProgress = 0;
-	cnt = 0;
+	cnt = vSkippedBytes = 0;
 	if (isResume)
 	{
 		GetOracleFileAttr(oraAllInOne, pDirectory, pRemoteFile, &oracleFileAttr);
 		if (oracleFileAttr.bExists)
-			cnt = oracleFileAttr.length;
+			cnt = vSkippedBytes = oracleFileAttr.length;
 		if (!cnt)
 			isResume = 0;
 	}
@@ -340,8 +382,8 @@ END;\
 	}
 
 	zStrm.zalloc = Z_NULL;
-    zStrm.zfree = Z_NULL;
-    zStrm.opaque = Z_NULL;
+	zStrm.zfree = Z_NULL;
+	zStrm.opaque = Z_NULL;
 
 	zRet = deflateInit2(&zStrm, compressionLevel ? compressionLevel : Z_DEFAULT_COMPRESSION, Z_DEFLATED, 16+MAX_WBITS, 8, Z_DEFAULT_STRATEGY);
 	if (zRet != Z_OK)
@@ -385,8 +427,8 @@ END;\
 			vSize = (piece == OCI_ONE_PIECE) ? ORA_BLOB_BUFFER_SIZE - zStrm.avail_out : 0;
 			if (zStrm.avail_out == ORA_BLOB_BUFFER_SIZE)
 				continue;
-			result = OCILobWrite2(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob, &vSize, 0, 1, blobBuffer, ORA_BLOB_BUFFER_SIZE - zStrm.avail_out, piece, 0, 0, 0, 0);
-			if (result != OCI_NEED_DATA && result)
+			ociResult = OCILobWrite2(oraAllInOne->svchp[0], oraAllInOne->errhp, oraAllInOne->blob, &vSize, 0, 1, blobBuffer, ORA_BLOB_BUFFER_SIZE - zStrm.avail_out, piece, 0, 0, 0, 0);
+			if (ociResult != OCI_NEED_DATA && ociResult)
 			{
 				(void)deflateEnd(&zStrm);
 				if (!isStdUsed)
@@ -406,11 +448,11 @@ END;\
 		fclose(fp);
 
 	/*vSize = 0;
-	if (OCILobWrite2(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob, &vSize, 0, 1, blobBuffer, 0, OCI_LAST_PIECE, 0, 0, 0, 0))
+	if (OCILobWrite2(oraAllInOne->svchp[0], oraAllInOne->errhp, oraAllInOne->blob, &vSize, 0, 1, blobBuffer, 0, OCI_LAST_PIECE, 0, 0, 0, 0))
 	{
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Error writing last piece to BLOB\n");
 	}
-	if (OCILobClose(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob))
+	if (OCILobClose(oraAllInOne->svchp[0], oraAllInOne->errhp, oraAllInOne->blob))
 	{
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to close temporary BLOB\n");
 	}*/
@@ -418,22 +460,29 @@ END;\
 	isError = 0;
         strcpy(vOpenMode, isResume ? "ab" : "wb");
 	SetSessionAction(oraAllInOne, "UPLOAD_AND_GUNZIP: GUNZIP");
-	PrepareStmtAndBind(oraAllInOne, &oraStmtUpload);
 
-	if (ExecuteStmt(oraAllInOne))
+	if (showProgress)
+		start_longops_meter(oraAllInOne, 0, 1);
+
+	PrepareStmtAndBind(oraAllInOne, &oraStmtUpload);
+	ociResult = ExecuteStmt(oraAllInOne);
+	if (showProgress)
+		stop_longops_meter();
+	if (ociResult)
 	{
 		ExitWithError(oraAllInOne, -1, ERROR_OCI, "Failed to decompress file in oracle directory\n");
 		isError = 1;
 	}
-
-	ReleaseStmt(oraAllInOne);
+	else
+		ReleaseStmt(oraAllInOne);
 	SetSessionAction(oraAllInOne, 0);
 
-	OCILobFreeTemporary(oraAllInOne->svchp, oraAllInOne->errhp, oraAllInOne->blob);
+	OCILobFreeTemporary(oraAllInOne->svchp[0], oraAllInOne->errhp, oraAllInOne->blob);
 
 	if (OCIDescriptorFree(oraAllInOne->blob, OCI_DTYPE_LOB))
 	{
-		ExitWithError(oraAllInOne, -1, ERROR_NONE, "Failed to free BLOB\n");
+		if (!isError)
+			ExitWithError(oraAllInOne, -1, ERROR_NONE, "Failed to free BLOB\n");
 		isError = 1;
 	}
 	oraAllInOne->blob = 0;

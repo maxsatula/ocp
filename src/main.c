@@ -48,6 +48,7 @@ struct PROGRAM_OPTIONS
 	const char* connectionString;
 
 	int isStdUsed;
+	int numberOfOracleSessions;
 };
 
 void ExitWithUsage(poptContext* poptcon)
@@ -186,6 +187,7 @@ SELECT t.file_name,\
 	programOptions.transferMode = TRANSFER_MODE_FAIL;
 	programOptions.connectionString = 0;
 	programOptions.isStdUsed = 0;
+	programOptions.numberOfOracleSessions = 1;
 
 	poptcon = poptGetContext(NULL, argc, argv, options, 0);
 	while ((rc = poptGetNextOpt(poptcon)) >= 0)
@@ -345,6 +347,8 @@ SELECT t.file_name,\
 			strcpy(vRemoteFile, basename(vLocalFile));
 		}
 
+		if (programOptions.compressionLevel > 0)
+			programOptions.numberOfOracleSessions = 2;
 		break;
 	case ACTION_LS:
 		strncpy(vDirectory, programOptions.lsDirectoryName, sizeof(vDirectory));	
@@ -393,6 +397,7 @@ SELECT t.file_name,\
 		}
 		strcpy(vLocalFile, vRemoteFile);
 		strcat(vLocalFile, ".gz");
+		programOptions.numberOfOracleSessions = 2;
 		break;
 	case ACTION_GUNZIP:
 		SplitToDirectoryAndFileName(&poptcon, vDirectory, vRemoteFile);
@@ -403,6 +408,7 @@ SELECT t.file_name,\
 		}
 		strcpy(vLocalFile, vRemoteFile);
 		vLocalFile[strlen(vRemoteFile) - 3] = '\0';
+		programOptions.numberOfOracleSessions = 2;
 		break;
 	}
 
@@ -419,7 +425,7 @@ SELECT t.file_name,\
 	if (!pwdptr)
 		ExitWithError(&oraAllInOne, 1, ERROR_OS, 0);
 
-	OracleLogon(&oraAllInOne, connectionString, pwdptr, dbconptr, PACKAGE);
+	OracleLogon(&oraAllInOne, connectionString, pwdptr, dbconptr, PACKAGE, programOptions.numberOfOracleSessions);
 
 	switch (programOptions.programAction)
 	{
