@@ -34,10 +34,10 @@ function download {
 }
 
 for file in progressmeter.h progressmeter.c atomicio.h atomicio.c misc.c; do
-	download "http://openbsd.cs.toronto.edu/cgi-bin/cvsweb/~checkout~/src/usr.bin/ssh/${file}" \
+	download "http://cvsweb.openbsd.org/cgi-bin/cvsweb/~checkout~/src/usr.bin/ssh/${file}" \
 	         progressmeter/${file}.orig
 done
-download "http://openbsd.cs.toronto.edu/cgi-bin/cvsweb/~checkout~/src/lib/libc/string/strlcat.c" \
+download "http://cvsweb.openbsd.org/cgi-bin/cvsweb/~checkout~/src/lib/libc/string/strlcat.c" \
          progressmeter/strlcat.c.orig
 download "http://git.savannah.gnu.org/gitweb/?p=autoconf-archive.git;a=blob_plain;f=m4/ax_lib_oracle_oci.m4" \
          m4/ax_lib_oracle_oci.m4.orig
