@@ -1,3 +1,7 @@
+2015-05-14  Max Satula <maksym.satula@gmail.com>
+
+* Even better support of long numbers in file sizes in --ls
+
 2015-04-21  Max Satula <maksym.satula@gmail.com>
 
 * Added support of multiple database sessions, e.g. worker session

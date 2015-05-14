@@ -33,7 +33,7 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 	ub8 vBytes;
 	char vLastModified[7];
 	int i;
-	long totalBytes;
+	long long totalBytes;
 
 	struct BINDVARIABLE oraBindsLs[] =
 	{
@@ -87,7 +87,7 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 
 	if (i)
 		printf("---------------------------------------- ------------ -------------------\n");
-	printf("%5d File(s) %39ld\n", i, totalBytes);
+	printf("%5d File(s) %39lld\n", i, totalBytes);
 
 	ReleaseStmt(oraAllInOne);	
 	SetSessionAction(oraAllInOne, 0);
