@@ -138,7 +138,7 @@ SELECT t.file_name,\
 	{
 		{ "interactive", 'i', POPT_ARG_VAL, &programOptions.transferMode, TRANSFER_MODE_INTERACTIVE, "prompt before overwrite (overrides previous -f -c options)" },
 		{ "force",       'f', POPT_ARG_VAL, &programOptions.transferMode, TRANSFER_MODE_OVERWRITE, "force overwrite an existing file (overrides previous -i -c options)" },
-		{ "keep-partial", '\0', POPT_ARG_VAL, &programOptions.isKeepPartial, 1, "if error occured, do not delete partially transferred file" },
+		{ "keep-partial", '\0', POPT_ARG_VAL, &programOptions.isKeepPartial, 1, "if an error occurred, do not delete partially transferred file" },
 		{ "continue", 'c', POPT_ARG_VAL, &programOptions.transferMode, TRANSFER_MODE_RESUME, "resume transfer (implies --keep-partial) (overrides previous -f -i options)" },
 		POPT_TABLEEND
 	};
