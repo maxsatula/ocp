@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <libgen.h>
 
 #include <oci.h>
 #include "oracle.h"
@@ -210,7 +211,7 @@ end;",
 			sourceSize = fileStat.st_size;
 		}
 
-		start_progress_meter(readingDirection ? pRemoteFile : pLocalFile, sourceSize, &cnt);
+		start_progress_meter(readingDirection ? pRemoteFile : basename(pLocalFile), sourceSize, &cnt);
 	}
 
 	PrepareStmtAndBind(oraAllInOne, readingDirection ? &oraStmtRead : &oraStmtWrite);

@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <string.h>
 #include <sys/stat.h>
 #include <zlib.h>
+#include <libgen.h>
 #include <oci.h>
 #include "oracle.h"
 #include "ocp.h"
@@ -45,6 +46,7 @@ void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDire
 	z_stream zStrm;
 	unsigned char zOut[ORA_BLOB_BUFFER_SIZE];
 	int showProgress;
+	char progressLine[MAX_FMT_SIZE];
 	int isStdUsed;
 	off_t cnt;
 	off_t sourceSize;
@@ -162,7 +164,9 @@ END;\
 	{
 		if (OCILobGetLength2(oraAllInOne->svchp[0], oraAllInOne->errhp, oraAllInOne->blob, (oraub8*)&sourceSize))
 			ExitWithError(oraAllInOne, 4, ERROR_OCI, "Error getting BLOB length\n");
-		start_progress_meter(pRemoteFile, sourceSize, &cnt);
+		strcpy(progressLine, "TRANSFER & GUNZIP: ");
+		strncat(progressLine, basename(pLocalFile), MAX_FMT_SIZE - 1 - strlen(progressLine));
+		start_progress_meter(progressLine, sourceSize, &cnt);
 	}
 
 	SetSessionAction(oraAllInOne, "GZIP_AND_DOWNLOAD: DOWNLOAD");
@@ -270,6 +274,7 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
 	z_stream zStrm;
 	unsigned char zIn[ORA_BLOB_BUFFER_SIZE];
 	int showProgress;
+	char progressLine[MAX_FMT_SIZE];
 	int isStdUsed;
 	off_t cnt;
 	off_t sourceSize;
@@ -361,7 +366,9 @@ END;\
 	{
 		stat(pLocalFile, &fileStat);
 		sourceSize = fileStat.st_size;
-		start_progress_meter(pLocalFile, sourceSize, &cnt);
+		strcpy(progressLine, "GZIP & TRANSFER: ");
+		strncat(progressLine, basename(pLocalFile), MAX_FMT_SIZE - 1 - strlen(progressLine));
+		start_progress_meter(progressLine, sourceSize, &cnt);
 	}
 
 

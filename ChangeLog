@@ -1,3 +1,7 @@
+2015-05-15  Max Satula <maksym.satula@gmail.com>
+
+* More accurate file names in a progress meter
+
 2015-05-14  Max Satula <maksym.satula@gmail.com>
 
 * Even better support of long numbers in file sizes in --ls
