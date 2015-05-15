@@ -2,6 +2,7 @@
 
 * Even better support of long numbers in file sizes in --ls
 * Fix typo
+* Add -k (--keep) option
 
 2015-04-21  Max Satula <maksym.satula@gmail.com>
 

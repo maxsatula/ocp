@@ -7,5 +7,6 @@ ocp 0.1
 * added --install and --deinstall options
 * if destination filename omitted, the source filename is used
 * when "-" is specified as a file name, it means STDIN/STDOUT
+* added -k (--keep) option
 
 ----------------------------------------------------------------------------

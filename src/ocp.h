@@ -35,13 +35,13 @@ void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
                   char* pDirectory, char* pRemoteFile, char* pLocalFile,
                   int isKeepPartial, int isResume);
 
-void Compress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compressionLevel,
+void Compress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compressionLevel, int isKeep,
               char* pOriginalFileName, char* pCompressedFileName);
-void Uncompress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory,
+void Uncompress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int isKeep,
                 char* pOriginalFileName, char* pUncompressedFileName);
-void SubmitCompressJob(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compressionLevel,
+void SubmitCompressJob(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compressionLevel, int isKeep,
                        char* pOriginalFileName, char* pCompressedFileName);
-void SubmitUncompressJob(struct ORACLEALLINONE *oraAllInOne, char* pDirectory,
+void SubmitUncompressJob(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int isKeep,
                          char* pOriginalFileName, char* pUncompressedFileName);
 
 void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirectory,

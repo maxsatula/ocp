@@ -29,7 +29,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "ocp.h"
 
 
-void Compress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compressionLevel,
+void Compress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compressionLevel, int isKeep,
               char* pOriginalFileName, char* pCompressedFileName)
 {
 	ub4 vCompressionLevel;
@@ -40,6 +40,7 @@ void Compress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compress
 	{
 		{ 0, SQLT_STR, ":directory",           pDirectory,          ORA_IDENTIFIER_SIZE + 1   },
 		{ 0, SQLT_INT, ":compression_level",   &vCompressionLevel,  sizeof(vCompressionLevel) },
+		{ 0, SQLT_INT, ":keep",                &isKeep,             sizeof(isKeep)            },
 		{ 0, SQLT_STR, ":original_filename"  , pOriginalFileName,   MAX_FMT_SIZE              },
 		{ 0, SQLT_STR, ":compressed_filename", pCompressedFileName, MAX_FMT_SIZE              },
 		{ 0 }
@@ -103,6 +104,9 @@ BEGIN\
 	END LOOP;\
 	DBMS_LOB.FREETEMPORARY(blob_buffer);\
 	UTL_FILE.FCLOSE(f_handle);\
+	IF :keep = 0 THEN\
+		UTL_FILE.FREMOVE(:directory, :original_filename);\
+	END IF;\
 END;\
 ",
 		0, oraBindsCompress, NO_ORACLE_DEFINES };
@@ -129,7 +133,7 @@ END;\
 	SetSessionAction(oraAllInOne, 0);
 }
 
-void Uncompress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory,
+void Uncompress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int isKeep,
                 char* pOriginalFileName, char* pUncompressedFileName)
 {
 	sword ociResult;
@@ -138,6 +142,7 @@ void Uncompress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory,
 	struct BINDVARIABLE oraBindsUncompress[] =
 	{
 		{ 0, SQLT_STR, ":directory",             pDirectory,            ORA_IDENTIFIER_SIZE + 1 },
+		{ 0, SQLT_INT, ":keep",                  &isKeep,               sizeof(isKeep)          },
 		{ 0, SQLT_STR, ":original_filename"  ,   pOriginalFileName,     MAX_FMT_SIZE            },
 		{ 0, SQLT_STR, ":uncompressed_filename", pUncompressedFileName, MAX_FMT_SIZE            },
 		{ 0 }
@@ -198,6 +203,9 @@ BEGIN\
 	UTL_FILE.FCLOSE(f_handle);\
 	UTL_COMPRESS.LZ_UNCOMPRESS_CLOSE(c_handle);\
 	DBMS_LOB.FREETEMPORARY(blob_buffer);\
+	IF :keep = 0 THEN\
+		UTL_FILE.FREMOVE(:directory, :original_filename);\
+	END IF;\
 END;\
 ",
 		0, oraBindsUncompress, NO_ORACLE_DEFINES };
@@ -222,7 +230,7 @@ END;\
 	SetSessionAction(oraAllInOne, 0);
 }
 
-void SubmitCompressJob(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compressionLevel,
+void SubmitCompressJob(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compressionLevel, int isKeep,
                        char* pOriginalFileName, char* pCompressedFileName)
 {
 	ub4 vCompressionLevel;
@@ -233,7 +241,8 @@ void SubmitCompressJob(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int
 		{ 0, SQLT_STR, ":job_name",            vJobName,            ORA_IDENTIFIER_SIZE + 1   },
 		{ 0, SQLT_STR, ":directory",           pDirectory,          ORA_IDENTIFIER_SIZE + 1   },
 		{ 0, SQLT_INT, ":compression_level",   &vCompressionLevel,  sizeof(vCompressionLevel) },
-		{ 0, SQLT_STR, ":original_filename"  , pOriginalFileName,   MAX_FMT_SIZE              },
+		{ 0, SQLT_INT, ":keep",                &isKeep,             sizeof(isKeep)            },
+		{ 0, SQLT_STR, ":original_filename",   pOriginalFileName,   MAX_FMT_SIZE              },
 		{ 0, SQLT_STR, ":compressed_filename", pCompressedFileName, MAX_FMT_SIZE              },
 		{ 0 }
 	};
@@ -314,6 +323,9 @@ BEGIN\
 	END LOOP;\
 	DBMS_LOB.FREETEMPORARY(blob_buffer);\
 	UTL_FILE.FCLOSE(f_handle);\
+	' || case when :keep = 0 then \
+		'UTL_FILE.FREMOVE(' || safe_directory_ || ', ' || safe_original_filename_ || ');'\
+	end || '\
 END;\
 ');\
 END;",
@@ -330,7 +342,7 @@ END;",
 	ReleaseStmt(oraAllInOne);
 }
 
-void SubmitUncompressJob(struct ORACLEALLINONE *oraAllInOne, char* pDirectory,
+void SubmitUncompressJob(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int isKeep,
                          char* pOriginalFileName, char* pUncompressedFileName)
 {
 	char vJobName[ORA_IDENTIFIER_SIZE + 1];
@@ -339,6 +351,7 @@ void SubmitUncompressJob(struct ORACLEALLINONE *oraAllInOne, char* pDirectory,
 	{
 		{ 0, SQLT_STR, ":job_name",              vJobName,              ORA_IDENTIFIER_SIZE + 1 },
 		{ 0, SQLT_STR, ":directory",             pDirectory,            ORA_IDENTIFIER_SIZE + 1 },
+		{ 0, SQLT_INT, ":keep",                  &isKeep,               sizeof(isKeep)          },
 		{ 0, SQLT_STR, ":original_filename"  ,   pOriginalFileName,     MAX_FMT_SIZE            },
 		{ 0, SQLT_STR, ":uncompressed_filename", pUncompressedFileName, MAX_FMT_SIZE            },
 		{ 0 }
@@ -415,6 +428,9 @@ BEGIN\
 	UTL_FILE.FCLOSE(f_handle);\
 	UTL_COMPRESS.LZ_UNCOMPRESS_CLOSE(c_handle);\
 	DBMS_LOB.FREETEMPORARY(blob_buffer);\
+	' || case when :keep = 0 then \
+		'UTL_FILE.FREMOVE(' || safe_directory_ || ', ' || safe_original_filename_ || ');'\
+	end || '\
 END;\
 ');\
 END;",

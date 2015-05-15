@@ -44,6 +44,7 @@ struct PROGRAM_OPTIONS
 	int compressionLevel;
 	int isBackground;
 	int isKeepPartial;
+	int isKeepOriginal;
 	enum TRANSFER_MODE transferMode;
 	const char* connectionString;
 
@@ -157,6 +158,7 @@ SELECT t.file_name,\
 		{ NULL, '8', POPT_ARG_NONE | POPT_ARGFLAG_DOC_HIDDEN, 0, 0x88 },
 		{ "best", '9', POPT_ARG_NONE, 0, 0x89, "Best compression method" },
 		{ "background", 'b', POPT_ARG_VAL, &programOptions.isBackground, 1, "Submit an Oracle Scheduler job and exit immediately" },
+		{ "keep", 'k', POPT_ARG_VAL, &programOptions.isKeepOriginal, 1, "keep (don't delete) input file" },
 		POPT_TABLEEND
 	};
 
@@ -184,6 +186,7 @@ SELECT t.file_name,\
 	programOptions.compressionLevel = 0;
 	programOptions.isBackground = 0;
 	programOptions.isKeepPartial = 0;
+	programOptions.isKeepOriginal = 0;
 	programOptions.transferMode = TRANSFER_MODE_FAIL;
 	programOptions.connectionString = 0;
 	programOptions.isStdUsed = 0;
@@ -239,6 +242,12 @@ SELECT t.file_name,\
 	if (programOptions.isBackground && programOptions.programAction != ACTION_GZIP && programOptions.programAction != ACTION_GUNZIP)
 	{
 		fprintf(stderr, "Background mode can only be specified for gzip/gunzip mode\n");
+		ExitWithUsage(&poptcon);
+	}
+
+	if (programOptions.isKeepOriginal && programOptions.programAction != ACTION_GZIP && programOptions.programAction != ACTION_GUNZIP)
+	{
+		fprintf(stderr, "--keep can only be specified for gzip/gunzip mode\n");
 		ExitWithUsage(&poptcon);
 	}
 
@@ -460,18 +469,18 @@ SELECT t.file_name,\
 		if (oracleFileAttr.bExists)
 			ConfirmOverwrite(&oraAllInOne, &programOptions, vLocalFile);
 		if (programOptions.isBackground)
-			SubmitCompressJob(&oraAllInOne, vDirectory, programOptions.compressionLevel, vRemoteFile, vLocalFile);
+			SubmitCompressJob(&oraAllInOne, vDirectory, programOptions.compressionLevel, programOptions.isKeepOriginal, vRemoteFile, vLocalFile);
 		else
-			Compress(&oraAllInOne, vDirectory, programOptions.compressionLevel, vRemoteFile, vLocalFile);
+			Compress(&oraAllInOne, vDirectory, programOptions.compressionLevel, programOptions.isKeepOriginal, vRemoteFile, vLocalFile);
 		break;
 	case ACTION_GUNZIP:
 		GetOracleFileAttr(&oraAllInOne, vDirectory, vLocalFile, &oracleFileAttr);
 		if (oracleFileAttr.bExists)
 			ConfirmOverwrite(&oraAllInOne, &programOptions, vLocalFile);
 		if (programOptions.isBackground)
-			SubmitUncompressJob(&oraAllInOne, vDirectory, vRemoteFile, vLocalFile);
+			SubmitUncompressJob(&oraAllInOne, vDirectory, programOptions.isKeepOriginal, vRemoteFile, vLocalFile);
 		else
-			Uncompress(&oraAllInOne, vDirectory, vRemoteFile, vLocalFile);
+			Uncompress(&oraAllInOne, vDirectory, programOptions.isKeepOriginal, vRemoteFile, vLocalFile);
 		break;
 	case ACTION_INSTALL:
 		InstallObjects(&oraAllInOne);
