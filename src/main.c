@@ -26,7 +26,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <libgen.h>
+#ifndef _WIN32
+# include <libgen.h>
+#else
+# include <shlwapi.h>
+#endif
 #include <popt.h>
 #include "oracle.h"
 #include "ocp.h"
@@ -353,7 +357,11 @@ SELECT t.file_name,\
 		    && !programOptions.isStdUsed
 		    && (strlen(vRemoteFile) == 0))
 		{
+#ifndef _WIN32
 			strcpy(vRemoteFile, basename(vLocalFile));
+#else
+			strcpy(vRemoteFile, PathFindFileName(vLocalFile));
+#endif
 		}
 
 		if (programOptions.compressionLevel > 0)
@@ -429,8 +437,10 @@ SELECT t.file_name,\
 
 	poptFreeContext(poptcon);
 
+#ifndef _WIN32
 	if (!pwdptr)
 		pwdptr = getpass("Password: ");
+#endif
 	if (!pwdptr)
 		ExitWithError(&oraAllInOne, 1, ERROR_OS, 0);
 
@@ -439,7 +449,11 @@ SELECT t.file_name,\
 	switch (programOptions.programAction)
 	{
 	case ACTION_READ:
+#ifndef _WIN32
 		if (!programOptions.isStdUsed && access(vLocalFile, F_OK) != -1)
+#else
+		if (!programOptions.isStdUsed && PathFileExists(vLocalFile))
+#endif
 			ConfirmOverwrite(&oraAllInOne, &programOptions, vLocalFile);
 		if (programOptions.compressionLevel > 0)
 			DownloadFileWithCompression(&oraAllInOne, vDirectory, programOptions.compressionLevel, vRemoteFile, vLocalFile, programOptions.isKeepPartial, programOptions.transferMode == TRANSFER_MODE_RESUME);

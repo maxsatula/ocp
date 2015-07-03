@@ -25,7 +25,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <unistd.h>
 #include <oci.h>
 #include "oracle.h"
-#include "longopsmeter.h"
+#ifndef _WIN32
+# include "longopsmeter.h"
+#endif
 #include "ocp.h"
 
 
@@ -34,7 +36,9 @@ void Compress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compress
 {
 	ub4 vCompressionLevel;
 	sword ociResult;
+#ifndef _WIN32
 	int showProgress;
+#endif
 
 	struct BINDVARIABLE oraBindsCompress[] =
 	{
@@ -115,16 +119,20 @@ END;\
 
 	SetSessionAction(oraAllInOne, "GZIP");
 
+#ifndef _WIN32
 	showProgress = 1;
 	if (!isatty(STDOUT_FILENO))
 		showProgress = 0;
 
 	if (showProgress)
 		start_longops_meter(oraAllInOne, 0, 1);
+#endif
 	PrepareStmtAndBind(oraAllInOne, &oraStmtCompress);
 	ociResult = ExecuteStmt(oraAllInOne);
+#ifndef _WIN32
 	if (showProgress)
 		stop_longops_meter();
+#endif
 
 	if (ociResult)
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to compress file in oracle directory\n");
@@ -137,7 +145,9 @@ void Uncompress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int isKeep
                 char* pOriginalFileName, char* pUncompressedFileName)
 {
 	sword ociResult;
+#ifndef _WIN32
 	int showProgress;
+#endif
 
 	struct BINDVARIABLE oraBindsUncompress[] =
 	{
@@ -212,16 +222,20 @@ END;\
 
 	SetSessionAction(oraAllInOne, "GUNZIP");
 
+#ifndef _WIN32
 	showProgress = 1;
 	if (!isatty(STDOUT_FILENO))
 		showProgress = 0;
 
 	if (showProgress)
 		start_longops_meter(oraAllInOne, 0, 1);
+#endif
 	PrepareStmtAndBind(oraAllInOne, &oraStmtUncompress);
 	ociResult = ExecuteStmt(oraAllInOne);
+#ifndef _WIN32
 	if (showProgress)
 		stop_longops_meter();
+#endif
 
 	if (ociResult)
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to uncompress file in oracle directory\n");

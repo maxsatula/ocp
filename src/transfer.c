@@ -26,13 +26,16 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <libgen.h>
+#ifndef _WIN32
+# include <libgen.h>
+#endif
 
 #include <oci.h>
 #include "oracle.h"
 #include "ocp.h"
-#include "progressmeter.h"
-
+#ifndef _WIN32
+# include "progressmeter.h"
+#endif
 
 void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
                   char* pDirectory, char* pRemoteFile, char* pLocalFile,
@@ -46,7 +49,9 @@ void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
 	ub8 vSkipBytes;
 	ub4 vFHandle1;
 	ub4 vFHandle2;
+#ifndef _WIN32
 	int showProgress;
+#endif
 	int isStdUsed;
 	off_t cnt;
 	off_t sourceSize;
@@ -194,6 +199,7 @@ end;",
 
 	ReleaseStmt(oraAllInOne);
 
+#ifndef _WIN32
 	showProgress = 1;
 	if (!isatty(STDOUT_FILENO) || isStdUsed)
 		showProgress = 0;
@@ -213,6 +219,7 @@ end;",
 
 		start_progress_meter(readingDirection ? pRemoteFile : basename(pLocalFile), sourceSize, &cnt);
 	}
+#endif
 
 	PrepareStmtAndBind(oraAllInOne, readingDirection ? &oraStmtRead : &oraStmtWrite);
 
@@ -351,8 +358,10 @@ end;",
 		}
 	}
 
+#ifndef _WIN32
 	if (showProgress)
 		stop_progress_meter();
+#endif
 	if (!isStdUsed)
 		fclose(fp);
 	ReleaseStmt(oraAllInOne);
