@@ -58,7 +58,11 @@ struct PROGRAM_OPTIONS
 
 void ExitWithUsage(poptContext* poptcon)
 {
+#ifndef _WIN32
 	poptPrintUsage(*poptcon, stderr, 0);
+#else
+	fprintf(stderr, "Try to run with --help or --usage option\n");
+#endif
 	exit(1);
 	/* 1 - Error in command line arguments */
 }
