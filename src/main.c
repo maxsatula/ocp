@@ -444,6 +444,22 @@ SELECT t.file_name,\
 #ifndef _WIN32
 	if (!pwdptr)
 		pwdptr = getpass("Password: ");
+#else
+	DWORD mode = 0;
+	char passBuffer[50];
+	if (!pwdptr)
+	{
+		HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
+		GetConsoleMode(hStdin, &mode);
+		SetConsoleMode(hStdin, mode & (~ENABLE_ECHO_INPUT));
+		fprintf(stderr, "Password: ");
+		fgets(passBuffer, 50, stdin);
+		SetConsoleMode(hStdin, mode);
+		fprintf(stderr, "\n");
+		if (strlen(passBuffer) > 0 && passBuffer[strlen(passBuffer) - 1] == '\n')
+			passBuffer[strlen(passBuffer) - 1] = '\0';
+		pwdptr = passBuffer;
+	}
 #endif
 	if (!pwdptr)
 		ExitWithError(&oraAllInOne, 1, ERROR_OS, 0);
