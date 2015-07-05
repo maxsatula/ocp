@@ -26,11 +26,15 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <string.h>
 #include <sys/stat.h>
 #include <zlib.h>
-#include <libgen.h>
+#ifndef _WIN32
+# include <libgen.h>
+#endif
 #include <oci.h>
 #include "oracle.h"
 #include "ocp.h"
-#include "progressmeter.h"
+#ifndef _WIN32
+# include "progressmeter.h"
+#endif
 
 void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirectory,
                                  int compressionLevel, char* pRemoteFile, char* pLocalFile,
@@ -45,8 +49,10 @@ void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDire
 	int zRet;
 	z_stream zStrm;
 	unsigned char zOut[ORA_BLOB_BUFFER_SIZE];
+#ifndef _WIN32
 	int showProgress;
 	char progressLine[MAX_FMT_SIZE];
+#endif
 	int isStdUsed;
 	off_t cnt;
 	off_t sourceSize;
@@ -145,21 +151,26 @@ END;\
 			isResume = 0;
 	}
 
+#ifndef _WIN32
 	showProgress = 1;
 	if (!isatty(STDOUT_FILENO) || isStdUsed)
 		showProgress = 0;
 
 	if (showProgress)
 		start_longops_meter(oraAllInOne, 0, 1);
+#endif
 
 	PrepareStmtAndBind(oraAllInOne, &oraStmtDownload);
 	ociResult = ExecuteStmt(oraAllInOne);
+#ifndef _WIN32
 	if (showProgress)
 		stop_longops_meter();
+#endif
 
 	if (ociResult)
 		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to compress file in oracle directory\n");
 
+#ifndef _WIN32
 	if (showProgress)
 	{
 		if (OCILobGetLength2(oraAllInOne->svchp[0], oraAllInOne->errhp, oraAllInOne->blob, (oraub8*)&sourceSize))
@@ -168,6 +179,7 @@ END;\
 		strncat(progressLine, basename(pLocalFile), MAX_FMT_SIZE - 1 - strlen(progressLine));
 		start_progress_meter(progressLine, sourceSize, &cnt);
 	}
+#endif
 
 	SetSessionAction(oraAllInOne, "GZIP_AND_DOWNLOAD: DOWNLOAD");
 	if (!isStdUsed && (fp = fopen(pLocalFile, isResume ? "ab" : "wb")) == NULL)
@@ -236,8 +248,10 @@ END;\
 		ociResult = OCILobRead2(oraAllInOne->svchp[0], oraAllInOne->errhp, oraAllInOne->blob, &vSize, 0, 1, blobBuffer, ORA_BLOB_BUFFER_SIZE, OCI_NEXT_PIECE, 0, 0, 0, 0);
 	}
 
+#ifndef _WIN32
 	if (showProgress)
 		stop_progress_meter();
+#endif
 	inflateEnd(&zStrm);
 	if (!isStdUsed)
 		fclose(fp);
@@ -273,8 +287,10 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
 	int zRet, zFlush;
 	z_stream zStrm;
 	unsigned char zIn[ORA_BLOB_BUFFER_SIZE];
+#ifndef _WIN32
 	int showProgress;
 	char progressLine[MAX_FMT_SIZE];
+#endif
 	int isStdUsed;
 	off_t cnt;
 	off_t sourceSize;
@@ -349,9 +365,12 @@ END;\
 	}*/
 	piece = OCI_FIRST_PIECE;
 
+#ifndef _WIN32
 	showProgress = 1;
 	if (!isatty(STDOUT_FILENO) || isStdUsed)
 		showProgress = 0;
+#endif
+
 	cnt = vSkippedBytes = 0;
 	if (isResume)
 	{
@@ -362,6 +381,7 @@ END;\
 			isResume = 0;
 	}
 
+#ifndef _WIN32
 	if (showProgress)
 	{
 		stat(pLocalFile, &fileStat);
@@ -370,7 +390,7 @@ END;\
 		strncat(progressLine, basename(pLocalFile), MAX_FMT_SIZE - 1 - strlen(progressLine));
 		start_progress_meter(progressLine, sourceSize, &cnt);
 	}
-
+#endif
 
 	if (!isStdUsed && (fp = fopen(pLocalFile, "rb")) == NULL)
 	{
@@ -448,8 +468,10 @@ END;\
 		while (zStrm.avail_out == 0);
 	}
 
+#ifndef _WIN32
 	if (showProgress)
 		stop_progress_meter();
+#endif
 	deflateEnd(&zStrm);
 	if (!isStdUsed)
 		fclose(fp);
@@ -468,13 +490,17 @@ END;\
         strcpy(vOpenMode, isResume ? "ab" : "wb");
 	SetSessionAction(oraAllInOne, "UPLOAD_AND_GUNZIP: GUNZIP");
 
+#ifndef _WIN32
 	if (showProgress)
 		start_longops_meter(oraAllInOne, 0, 1);
+#endif
 
 	PrepareStmtAndBind(oraAllInOne, &oraStmtUpload);
 	ociResult = ExecuteStmt(oraAllInOne);
+#ifndef _WIN32
 	if (showProgress)
 		stop_longops_meter();
+#endif
 	if (ociResult)
 	{
 		ExitWithError(oraAllInOne, -1, ERROR_OCI, "Failed to decompress file in oracle directory\n");
