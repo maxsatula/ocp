@@ -1,3 +1,7 @@
+2015-07-07  Max Satula <maksym.satula@gmail.com>
+
+* Tolerate Oracle directories may or may not be specified in uppercase in a command line
+
 2015-05-15  Max Satula <maksym.satula@gmail.com>
 
 * More accurate file names in a progress meter

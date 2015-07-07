@@ -30,6 +30,7 @@ struct ORACLEFILEATTR
 };
 
 void GetOracleFileAttr(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, char* pFileName, struct ORACLEFILEATTR *oraFileAttr);
+void TryDirectory(struct ORACLEALLINONE *oraAllInOne, char* pDirectory);
 
 void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
                   char* pDirectory, char* pRemoteFile, char* pLocalFile,

@@ -469,6 +469,7 @@ SELECT t.file_name,\
 	switch (programOptions.programAction)
 	{
 	case ACTION_READ:
+		TryDirectory(&oraAllInOne, vDirectory);
 #ifndef _WIN32
 		if (!programOptions.isStdUsed && access(vLocalFile, F_OK) != -1)
 #else
@@ -481,6 +482,7 @@ SELECT t.file_name,\
 			TransferFile(&oraAllInOne, 1, vDirectory, vRemoteFile, vLocalFile, programOptions.isKeepPartial, programOptions.transferMode == TRANSFER_MODE_RESUME);
 		break;
 	case ACTION_WRITE:
+		TryDirectory(&oraAllInOne, vDirectory);
 		GetOracleFileAttr(&oraAllInOne, vDirectory, vRemoteFile, &oracleFileAttr);
 		if (oracleFileAttr.bExists)
 			ConfirmOverwrite(&oraAllInOne, &programOptions, vRemoteFile);
@@ -493,12 +495,15 @@ SELECT t.file_name,\
 		LsDir(&oraAllInOne);
 		break;
 	case ACTION_LS:
+		TryDirectory(&oraAllInOne, vDirectory);
 		Ls(&oraAllInOne, vDirectory, sqlLs);
 		break;
 	case ACTION_RM:
+		TryDirectory(&oraAllInOne, vDirectory);
 		Rm(&oraAllInOne, vDirectory, vRemoteFile);
 		break;
 	case ACTION_GZIP:
+		TryDirectory(&oraAllInOne, vDirectory);
 		GetOracleFileAttr(&oraAllInOne, vDirectory, vLocalFile, &oracleFileAttr);
 		if (oracleFileAttr.bExists)
 			ConfirmOverwrite(&oraAllInOne, &programOptions, vLocalFile);
@@ -508,6 +513,7 @@ SELECT t.file_name,\
 			Compress(&oraAllInOne, vDirectory, programOptions.compressionLevel, programOptions.isKeepOriginal, vRemoteFile, vLocalFile);
 		break;
 	case ACTION_GUNZIP:
+		TryDirectory(&oraAllInOne, vDirectory);
 		GetOracleFileAttr(&oraAllInOne, vDirectory, vLocalFile, &oracleFileAttr);
 		if (oracleFileAttr.bExists)
 			ConfirmOverwrite(&oraAllInOne, &programOptions, vLocalFile);
