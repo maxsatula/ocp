@@ -15,6 +15,8 @@ AC_PROG_INSTALL
 AC_PROG_RANLIB
 AM_PROG_CC_C_O
 
+AC_SYS_LARGEFILE
+
 # Checks for libraries.
 AX_LIB_ORACLE_OCI
 if test "x${HAVE_ORACLE_OCI}" = xno; then

@@ -57,8 +57,8 @@ DECLARE\
 	raw_buffer RAW(32767);\
 	blob_buffer BLOB;\
 	actual_size NUMBER;\
-	pos BINARY_INTEGER;\
-	blobsize BINARY_INTEGER;\
+	pos NUMBER;\
+	blobsize NUMBER;\
 	rindex BINARY_INTEGER;\
 	slno BINARY_INTEGER;\
 	target NUMBER;\
@@ -164,7 +164,7 @@ DECLARE\
 	c_handle BINARY_INTEGER;\
 	raw_buffer RAW(32767);\
 	blob_buffer BLOB;\
-	pos BINARY_INTEGER;\
+	pos NUMBER;\
 	rindex BINARY_INTEGER;\
 	slno BINARY_INTEGER;\
 	target NUMBER;\
@@ -286,8 +286,8 @@ DECLARE\
 	raw_buffer RAW(32767);\
 	blob_buffer BLOB;\
 	actual_size NUMBER;\
-	pos BINARY_INTEGER;\
-	blobsize BINARY_INTEGER;\
+	pos NUMBER;\
+	blobsize NUMBER;\
 	rindex BINARY_INTEGER;\
 	slno BINARY_INTEGER;\
 	target NUMBER;\
@@ -393,7 +393,7 @@ DECLARE\
 	c_handle BINARY_INTEGER;\
 	raw_buffer RAW(32767);\
 	blob_buffer BLOB;\
-	pos BINARY_INTEGER;\
+	pos NUMBER;\
 	rindex BINARY_INTEGER;\
 	slno BINARY_INTEGER;\
 	target NUMBER;\

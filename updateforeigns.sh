@@ -50,13 +50,14 @@ download "http://git.savannah.gnu.org/gitweb/?p=gnulib.git;a=blob_plain;f=lib/ye
 
 # 2.1. Easy case, sources work well unmodified
 
-for file in progressmeter.h atomicio.h strlcat.c; do
+for file in progressmeter.h atomicio.h; do
 	cp progressmeter/${file}.orig progressmeter/${file}
 done
 
 # 2.2. Medium case, sources need a slight patch
 
-for file in progressmeter/progressmeter.c progressmeter/atomicio.c m4/ax_lib_oracle_oci.m4; do
+for file in progressmeter/progressmeter.c progressmeter/atomicio.c progressmeter/strlcat.c \
+        m4/ax_lib_oracle_oci.m4; do
 	patch --backup-if-mismatch -u -o ${file} ${file}.orig ${file}.patch
 done
 

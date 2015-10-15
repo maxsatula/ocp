@@ -21,6 +21,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  * too), see also copyrights in that file
  */
 
+#if HAVE_CONFIG_H
+# include <config.h>
+#endif
+
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/uio.h>

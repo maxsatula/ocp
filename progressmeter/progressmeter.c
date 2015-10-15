@@ -23,6 +23,11 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* Added by Max Satula */
+#if HAVE_CONFIG_H
+# include <config.h>
+#endif
+
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/uio.h>

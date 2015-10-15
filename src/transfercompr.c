@@ -73,7 +73,7 @@ DECLARE\
 	f_handle UTL_FILE.FILE_TYPE;\
 	c_handle BINARY_INTEGER;\
 	raw_buffer RAW(32767);\
-	pos BINARY_INTEGER;\
+	pos NUMBER;\
 	rindex BINARY_INTEGER;\
 	slno BINARY_INTEGER;\
 	target NUMBER;\
@@ -314,7 +314,7 @@ DECLARE\
 	f_handle UTL_FILE.FILE_TYPE;\
 	c_handle BINARY_INTEGER;\
 	raw_buffer RAW(32767);\
-	pos BINARY_INTEGER;\
+	pos NUMBER;\
 	rindex BINARY_INTEGER;\
 	slno BINARY_INTEGER;\
 	target NUMBER;\
