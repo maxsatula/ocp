@@ -213,6 +213,7 @@ void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
                  const char* userName,
                  const char* password,
                  const char* connection,
+                 ub4 adminMode,
                  const char* module,
                  int numberOfConnections)
 {
@@ -281,7 +282,7 @@ void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
 			attrType = OCI_CRED_EXT;
 
 		switch (OCISessionBegin(oraAllInOne->svchp[i], oraAllInOne->errhp,
-		                        oraAllInOne->usrhp[i], attrType, OCI_DEFAULT))
+		                        oraAllInOne->usrhp[i], attrType, adminMode))
 		{
 		case OCI_SUCCESS_WITH_INFO:
 			ExitWithError(oraAllInOne, -1, ERROR_OCI, 0);

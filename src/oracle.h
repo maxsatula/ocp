@@ -97,6 +97,7 @@ void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
                  const char* userName,
                  const char* password,
                  const char* connection,
+                 ub4 adminMode,
                  const char* module,
                  int numberOfConnections);
 

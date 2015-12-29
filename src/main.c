@@ -51,6 +51,7 @@ struct PROGRAM_OPTIONS
 	int isKeepOriginal;
 	enum TRANSFER_MODE transferMode;
 	const char* connectionString;
+	ub4 adminMode;
 
 	int isStdUsed;
 	int numberOfOracleSessions;
@@ -182,6 +183,8 @@ SELECT t.file_name,\
 		{ "list-directories", '\0', POPT_ARG_NONE, 0, ACTION_LSDIR, "List Oracle directories" },
 		{ "ls", '\0', POPT_ARG_STRING, &programOptions.lsDirectoryName, ACTION_LS, "List files in Oracle directory", "DIRECTORY" },
 		{ "rm", '\0', POPT_ARG_NONE, 0, ACTION_RM, "Remove file from Oracle directory" },
+		{ "sysdba", '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSDBA, "Connect as SYSDBA" },
+		{ "sysoper", '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSOPER, "Connect as SYSOPER" },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, transferModeOptions, 0, "Transfer options:" },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, compressionOptions, 0, "Compression options:" },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, objOptions, 0, "Database objects for --ls support:" },
@@ -199,6 +202,7 @@ SELECT t.file_name,\
 	programOptions.connectionString = 0;
 	programOptions.isStdUsed = 0;
 	programOptions.numberOfOracleSessions = 1;
+	programOptions.adminMode = OCI_DEFAULT;
 
 	poptcon = poptGetContext(NULL, argc, argv, options, 0);
 	while ((rc = poptGetNextOpt(poptcon)) >= 0)
@@ -464,7 +468,7 @@ SELECT t.file_name,\
 	if (!pwdptr)
 		ExitWithError(&oraAllInOne, 1, ERROR_OS, 0);
 
-	OracleLogon(&oraAllInOne, connectionString, pwdptr, dbconptr, PACKAGE, programOptions.numberOfOracleSessions);
+	OracleLogon(&oraAllInOne, connectionString, pwdptr, dbconptr, programOptions.adminMode, PACKAGE, programOptions.numberOfOracleSessions);
 
 	switch (programOptions.programAction)
 	{

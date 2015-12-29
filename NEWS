@@ -8,5 +8,6 @@ ocp 0.1
 * if destination filename omitted, the source filename is used
 * when "-" is specified as a file name, it means STDIN/STDOUT
 * added -k (--keep) option
+* added --sysdba and --sysoper options to connect to Oracle accordingly
 
 ----------------------------------------------------------------------------
