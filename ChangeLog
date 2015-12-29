@@ -1,3 +1,7 @@
+2015-12-29  Max Satula <maksym.satula@gmail.com>
+
+* Try to detect server type and abort if not DEDICATED when downloading
+
 2015-10-15  Max Satula <maksym.satula@gmail.com>
 
 * Support of large (>2Gb) files in 32-bit systems

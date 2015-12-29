@@ -49,6 +49,7 @@ void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
 	ub8 vSkipBytes;
 	ub4 vFHandle1;
 	ub4 vFHandle2;
+	char vServerType[10];
 #ifndef _WIN32
 	int showProgress;
 #endif
@@ -159,6 +160,32 @@ begin \
   utl_file.put_raw(handle, :buffer); \
 end;",
 	       0, bindVariablesWrite, NO_ORACLE_DEFINES };
+
+	struct ORACLEDEFINE oraDefinesGetServerType[] =
+	{
+		{ 0, SQLT_STR, vServerType, sizeof(vServerType), 0 },
+		{ 0 }
+	};
+
+	struct ORACLESTATEMENT oraStmtGetServerType = { "\
+select server \
+  from v$session \
+ where audsid = sys_context('USERENV', 'SESSIONID')",
+	       0, NO_BIND_VARIABLES, oraDefinesGetServerType };
+
+	if (readingDirection)
+	{
+		PrepareStmtAndBind(oraAllInOne, &oraStmtGetServerType);
+		if (ExecuteStmt(oraAllInOne) != OCI_SUCCESS)
+		{
+			fprintf(stderr, "WARNING: unable to detect whether DEDICATED server is used\n");
+		}
+		else if (strcmp(vServerType, "DEDICATED"))
+		{
+			ExitWithError(oraAllInOne, 4, ERROR_NONE, "Must connect through DEDICATED server, got %s\n", vServerType);
+		}
+		ReleaseStmt(oraAllInOne);
+	}
 
 	isStdUsed = !strcmp(pLocalFile, "-");
 	if (isStdUsed)
