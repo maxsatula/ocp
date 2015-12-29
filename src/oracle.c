@@ -344,7 +344,7 @@ void GetSessionId(struct ORACLEALLINONE *oraAllInOne, struct ORACLESESSIONID *or
 {
 	struct ORACLEDEFINE oraDefinesGetSid[] =
 	{
-		{ 0, SQLT_INT, &oracleSessionId->sid, sizeof(oracleSessionId->sid), 0 },
+		{ 0, SQLT_INT, &oracleSessionId->sid,      sizeof(oracleSessionId->sid),      0 },
 		{ 0, SQLT_INT, &oracleSessionId->instance, sizeof(oracleSessionId->instance), 0 },
 		{ 0 }
         };
