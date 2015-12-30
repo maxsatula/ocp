@@ -34,6 +34,7 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 	char vLastModified[7];
 	int i;
 	long long totalBytes;
+	int foundKnownSize, foundUnknownSize;
 
 	struct BINDVARIABLE oraBindsLs[] =
 	{
@@ -63,20 +64,31 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 
 	i = 0;
 	totalBytes = 0;
+	foundKnownSize = foundUnknownSize = 0;
 	ociResult = ExecuteStmt(oraAllInOne);
 	while (ociResult == OCI_SUCCESS)
 	{
-		printf("%-40s %12lld %02d/%02d/%d %02d:%02d:%02d\n",
-			   vFileName,
-			   (long long)vBytes,
-		       (int)vLastModified[2],
-		       (int)vLastModified[3],
-			   ((int)vLastModified[0]-100) * 100 + ((int)vLastModified[1] - 100),
-		       (int)vLastModified[4] - 1,
-		       (int)vLastModified[5] - 1,
-		       (int)vLastModified[6] - 1);
+		if (oraStmtLs.oraDefines[1].indp != -1 &&
+		    oraStmtLs.oraDefines[2].indp != -1)
+		{
+			printf("%-40s %12lld %02d/%02d/%d %02d:%02d:%02d\n",
+			       vFileName,
+			       (long long)vBytes,
+			       (int)vLastModified[2],
+			       (int)vLastModified[3],
+			       ((int)vLastModified[0]-100) * 100 + ((int)vLastModified[1] - 100),
+			       (int)vLastModified[4] - 1,
+			       (int)vLastModified[5] - 1,
+			       (int)vLastModified[6] - 1);
+			totalBytes += vBytes;
+			foundKnownSize = 1;
+		}
+		else
+		{
+			printf("%-40s  (no access) (no access)\n", vFileName);
+			foundUnknownSize = 1;
+		}
 		i++;
-		totalBytes += vBytes;
 
 		ociResult = OCIStmtFetch2(oraStmtLs.stmthp, oraAllInOne->errhp, 1,
 								  OCI_FETCH_NEXT, 1, OCI_DEFAULT);
@@ -87,7 +99,11 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 
 	if (i)
 		printf("---------------------------------------- ------------ -------------------\n");
-	printf("%5d File(s) %39lld\n", i, totalBytes);
+	printf("%5d File(s)", i);
+	if (!foundKnownSize && foundUnknownSize)
+		printf("\n");
+	else
+		printf(" %39lld%s\n", totalBytes, foundUnknownSize ? "+" : "");
 
 	ReleaseStmt(oraAllInOne);	
 	SetSessionAction(oraAllInOne, 0);

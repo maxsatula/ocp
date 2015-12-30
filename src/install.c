@@ -65,8 +65,12 @@ public class j_ocp_DirList\n\
 		for (int i = 0; i < files.length; i++)\n\
 		{\n\
 			result[i][0] = files[i].getName();\n\
-			result[i][1] = new Long(files[i].length());\n\
-			result[i][2] = new Timestamp(files[i].lastModified());\n\
+			try\n\
+			{\n\
+				result[i][1] = new Long(files[i].length());\n\
+				result[i][2] = new Timestamp(files[i].lastModified());\n\
+			}\n\
+			catch ( java.security.AccessControlException e ) {}\n\
 		}\n\
 		return new ARRAY(arrayDescriptor, conn, result);\n\
 	}\n\
