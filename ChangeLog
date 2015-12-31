@@ -1,3 +1,7 @@
+2015-12-31  Max Satula <maksym.satula@gmail.com>
+
+* Improve and optimize wildcard filtering for --ls
+
 2015-12-30  Max Satula <maksym.satula@gmail.com>
 
 * Write (no access) if unable to get file size/date in --ls

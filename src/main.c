@@ -129,14 +129,8 @@ int main(int argc, const char *argv[])
 	char vRemoteFile[MAX_FMT_SIZE];
 	const char* fileNamePtr;
 	const char *localArg, *remoteArg;
-	char* sqlLsPtr;
-	char sqlLs[10000] = "\
-SELECT t.file_name,\
-       t.bytes,\
-       t.last_modified\
-  FROM all_directories d,\
-       TABLE(f_ocp_dir_list(d.directory_path)) t\
- WHERE d.directory_name = :directory";
+	char* filePatternPtr;
+	char filePatterns[1000];
 	struct stat fileStat;
 	struct ORACLEALLINONE oraAllInOne = { 0, 0, 0, 0 };
 	struct PROGRAM_OPTIONS programOptions;
@@ -383,31 +377,17 @@ SELECT t.file_name,\
 			ExitWithUsage(&poptcon);
 		}
 
-		if (poptPeekArg(poptcon))
+		filePatterns[0] = '\0';
+		filePatternPtr = filePatterns;
+		while (poptPeekArg(poptcon))
 		{
-			strcat(sqlLs, " AND (");
-			while (poptPeekArg(poptcon))
+			if (filePatternPtr - filePatterns + strlen(poptPeekArg(poptcon)) + 1 >= sizeof(filePatterns))
 			{
-				if (strlen(sqlLs) + 25/*approx*/ + strlen(poptPeekArg(poptcon)) >= 1000)
-				{
-					fprintf(stderr, "File list is too long\n");
-					ExitWithUsage(&poptcon);
-				}
-				strcat(sqlLs, "t.file_name like '");
-				sqlLsPtr = sqlLs + strlen(sqlLs);
-				strcpy(sqlLsPtr, poptGetArg(poptcon));
-				while (*sqlLsPtr)
-				{
-					if (*sqlLsPtr == '*')
-						*sqlLsPtr = '%';
-					else if (*sqlLsPtr == '?')
-						*sqlLsPtr = '_';
-					sqlLsPtr++;
-				}
-				strcat(sqlLs, "' OR ");				
+				fprintf(stderr, "File list is too long\n");
+				ExitWithUsage(&poptcon);
 			}
-			sqlLs[strlen(sqlLs)-4] = ')';
-			sqlLs[strlen(sqlLs)-3] = '\0';
+			strcpy(filePatternPtr, poptGetArg(poptcon));
+			filePatternPtr += strlen(filePatternPtr) + 1;
 		}
 		break;
 	case ACTION_RM:
@@ -500,7 +480,7 @@ SELECT t.file_name,\
 		break;
 	case ACTION_LS:
 		TryDirectory(&oraAllInOne, vDirectory);
-		Ls(&oraAllInOne, vDirectory, sqlLs);
+		Ls(&oraAllInOne, vDirectory, filePatterns, filePatternPtr - filePatterns);
 		break;
 	case ACTION_RM:
 		TryDirectory(&oraAllInOne, vDirectory);

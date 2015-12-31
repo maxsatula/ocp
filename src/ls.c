@@ -26,7 +26,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "oracle.h"
 #include "ocp.h"
 
-void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
+void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* patterns, int patternLength)
 {
 	sword ociResult;
 	char vFileName[MAX_FMT_SIZE];
@@ -38,6 +38,7 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 
 	struct BINDVARIABLE oraBindsLs[] =
 	{
+		{ 0, SQLT_CHR, ":patterns",  patterns,   patternLength           },
 		{ 0, SQLT_STR, ":directory", pDirectory, ORA_IDENTIFIER_SIZE + 1 },
 		{ 0 }
 	};
@@ -51,7 +52,13 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql)
 	};
 
 	struct ORACLESTATEMENT oraStmtLs = {
-	       sql,
+	       "\
+SELECT t.file_name,\
+       t.bytes,\
+       t.last_modified\
+  FROM all_directories d,\
+       TABLE(f_ocp_dir_list(d.directory_path, :patterns)) t\
+ WHERE d.directory_name = :directory",
 	       0, oraBindsLs, oraDefinesLs };
 
 	SetSessionAction(oraAllInOne, "LS");

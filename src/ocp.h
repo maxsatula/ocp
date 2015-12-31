@@ -53,7 +53,7 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
                                int isKeepPartial, int isResume);
 
 void LsDir(struct ORACLEALLINONE *oraAllInOne);
-void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql);
+void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* patterns, int patternLength);
 void Rm(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, char* pFileName);
 
 void InstallObjects(struct ORACLEALLINONE* oraAllInOne);
