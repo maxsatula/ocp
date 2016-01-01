@@ -1,3 +1,7 @@
+2016-01-01  Max Satula <maksym.satula@gmail.com>
+
+* Add ability to calculate MD5 or SHA1 digests in --ls
+
 2015-12-31  Max Satula <maksym.satula@gmail.com>
 
 * Improve and optimize wildcard filtering for --ls

@@ -52,6 +52,7 @@ struct PROGRAM_OPTIONS
 	enum TRANSFER_MODE transferMode;
 	const char* connectionString;
 	ub4 adminMode;
+	enum HASH_ALGORITHM hashAlgorithm;
 
 	int isStdUsed;
 	int numberOfOracleSessions;
@@ -165,6 +166,13 @@ int main(int argc, const char *argv[])
 		POPT_TABLEEND
 	};
 
+	struct poptOption lsOptions[] =
+	{
+		{ "md5", '\0', POPT_ARG_VAL, &programOptions.hashAlgorithm, HASH_MD5, "Calculate MD5 on listed files" },
+		{ "sha1", '\0', POPT_ARG_VAL, &programOptions.hashAlgorithm, HASH_SHA1, "Calculate SHA1 on listed files" },
+		POPT_TABLEEND
+	};
+
 	struct poptOption objOptions[] =
 	{
 		{ "install", '\0', POPT_ARG_NONE, 0, ACTION_INSTALL, "Install objects" },
@@ -181,6 +189,7 @@ int main(int argc, const char *argv[])
 		{ "sysoper", '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSOPER, "Connect as SYSOPER" },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, transferModeOptions, 0, "Transfer options:" },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, compressionOptions, 0, "Compression options:" },
+		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, lsOptions, 0, "File list options:" },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, objOptions, 0, "Database objects for --ls support:" },
 		POPT_AUTOHELP
 		POPT_TABLEEND
@@ -197,6 +206,7 @@ int main(int argc, const char *argv[])
 	programOptions.isStdUsed = 0;
 	programOptions.numberOfOracleSessions = 1;
 	programOptions.adminMode = OCI_DEFAULT;
+	programOptions.hashAlgorithm = 0;
 
 	poptcon = poptGetContext(NULL, argc, argv, options, 0);
 	while ((rc = poptGetNextOpt(poptcon)) >= 0)
@@ -254,6 +264,12 @@ int main(int argc, const char *argv[])
 	if (programOptions.isKeepOriginal && programOptions.programAction != ACTION_GZIP && programOptions.programAction != ACTION_GUNZIP)
 	{
 		fprintf(stderr, "--keep can only be specified for gzip/gunzip mode\n");
+		ExitWithUsage(&poptcon);
+	}
+
+	if (programOptions.hashAlgorithm && programOptions.programAction != ACTION_LS)
+	{
+		fprintf(stderr, "Hashing option can only be specified for list mode\n");
 		ExitWithUsage(&poptcon);
 	}
 
@@ -480,7 +496,7 @@ int main(int argc, const char *argv[])
 		break;
 	case ACTION_LS:
 		TryDirectory(&oraAllInOne, vDirectory);
-		Ls(&oraAllInOne, vDirectory, filePatterns, filePatternPtr - filePatterns);
+		Ls(&oraAllInOne, vDirectory, filePatterns, filePatternPtr - filePatterns, programOptions.hashAlgorithm);
 		break;
 	case ACTION_RM:
 		TryDirectory(&oraAllInOne, vDirectory);

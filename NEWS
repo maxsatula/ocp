@@ -1,6 +1,7 @@
 ocp <future-version>
 
 * added --sysdba and --sysoper options to connect to Oracle accordingly
+* added --md5 and --sha1 options to calculate file hashes
 
 ----------------------------------------------------------------------------
 
