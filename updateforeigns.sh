@@ -45,6 +45,8 @@ download "http://git.savannah.gnu.org/gitweb/?p=gnulib.git;a=blob_plain;f=lib/ye
          yesno/yesno.h
 download "http://git.savannah.gnu.org/gitweb/?p=gnulib.git;a=blob_plain;f=lib/yesno.c;hb=HEAD" \
          yesno/yesno.c
+download "https://raw.githubusercontent.com/rtyley/globs-for-java/master/src/main/java/com/madgag/globs/openjdk/Globs.java" \
+         src/Globs.java.orig
 
 # 2. Apply patches
 
@@ -57,7 +59,7 @@ done
 # 2.2. Medium case, sources need a slight patch
 
 for file in progressmeter/progressmeter.c progressmeter/atomicio.c progressmeter/strlcat.c \
-        m4/ax_lib_oracle_oci.m4; do
+        m4/ax_lib_oracle_oci.m4 src/Globs.java; do
 	patch --backup-if-mismatch -u -o ${file} ${file}.orig ${file}.patch
 done
 
@@ -124,5 +126,6 @@ rm progressmeter/progressmeter.h.orig \
    progressmeter/atomicio.c.orig \
    progressmeter/misc.c.orig \
    progressmeter/strlcat.c.orig \
-   m4/ax_lib_oracle_oci.m4.orig
+   m4/ax_lib_oracle_oci.m4.orig \
+   src/Globs.java.orig
 

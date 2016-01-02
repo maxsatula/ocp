@@ -1,0 +1,74 @@
+"CREATE OR REPLACE\n\
+	AND COMPILE\n\
+	JAVA SOURCE NAMED \"j_ocp_DirList\"\n\
+AS\n\
+import java.io.File;\n\
+import java.io.FilenameFilter;\n\
+import java.io.FileInputStream;\n\
+import java.io.FileNotFoundException;\n\
+import java.io.IOException;\n\
+import java.security.MessageDigest;\n\
+import java.security.NoSuchAlgorithmException;\n\
+import java.sql.Connection;\n\
+import java.sql.SQLException;\n\
+import java.sql.Timestamp;\n\
+import oracle.sql.ARRAY;\n\
+import oracle.sql.ArrayDescriptor;\n\
+import oracle.jdbc.driver.OracleDriver;\n\
+import java.util.regex.PatternSyntaxException;\n\
+\n\
+public class j_ocp_DirList\n\
+{\n\
+	public static ARRAY getList(String directory, String pattern, String hashAlgorithm)\n\
+		throws SQLException, NoSuchAlgorithmException\n\
+	{\n\
+		Connection conn = new OracleDriver().defaultConnection();\n\
+		ArrayDescriptor arrayDescriptor = new ArrayDescriptor(\"T_OCP_FILE_LIST\", conn);\n\
+		File path = new File(directory);\n\
+		File[] files;\n\
+		if (pattern != null) {\n\
+			final String[] patterns = pattern.split(\"\\0\");\n\
+			FilenameFilter globFilter = new FilenameFilter() {\n\
+				public boolean accept(File dir, String name) {\n\
+					for (String pattern : patterns) {\n\
+						if (name.matches(Globs.toUnixRegexPattern(pattern))) {\n\
+							return true;\n\
+						}\n\
+					}\n\
+					return false;\n\
+				}\n\
+			};\n\
+			files = path.listFiles(globFilter);\n\
+		} else {\n\
+			files = path.listFiles();\n\
+		}\n\
+		Object[][] result = new Object[files.length][4];\n\
+		for (int i = 0; i < files.length; i++)\n\
+		{\n\
+			result[i][0] = files[i].getName();\n\
+			try\n\
+			{\n\
+				result[i][1] = new Long(files[i].length());\n\
+				result[i][2] = new Timestamp(files[i].lastModified());\n\
+				if (hashAlgorithm != null) {\n\
+					try {\n\
+						FileInputStream inputStream = new FileInputStream(files[i]);\n\
+						MessageDigest digest = MessageDigest.getInstance(hashAlgorithm);\n\
+						byte[] bytesBuffer = new byte[65536];\n\
+						int bytesRead = -1;\n\
+\n\
+						while ((bytesRead = inputStream.read(bytesBuffer)) != -1) {\n\
+							digest.update(bytesBuffer, 0, bytesRead);\n\
+						}\n\
+\n\
+						result[i][3] = digest.digest();\n\
+					}\n\
+					catch (FileNotFoundException e) {}\n\
+					catch (IOException e) {}\n\
+				}\n\
+			}\n\
+			catch ( java.security.AccessControlException e ) {}\n\
+		}\n\
+		return new ARRAY(arrayDescriptor, conn, result);\n\
+	}\n\
+}"
