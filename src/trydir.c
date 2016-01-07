@@ -43,8 +43,8 @@ void TryDirectory(struct ORACLEALLINONE *oraAllInOne, char* pDirectory)
         };
 
 	struct ORACLESTATEMENT oraStmtTryDirectory = { "\
-SELECT MIN(DECODE(directory_name, :directory, 1, 2))\
-  FROM all_directories\
+SELECT MIN(DECODE(directory_name, :directory, 1, 2))\n\
+  FROM all_directories\n\
  WHERE directory_name IN (:directory, UPPER(:directory))\
 ",
 	       0, bindVariablesTryDirectory, oraDefinesTryDirectory };

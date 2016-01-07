@@ -44,20 +44,20 @@ void LsDir(struct ORACLEALLINONE *oraAllInOne)
 	};
 
 	struct ORACLESTATEMENT oraStmtLsDir = { "\
-SELECT d.directory_name,\
-       d.directory_path,\
-       pr.grantable,\
-       pw.grantable\
-  FROM all_directories d\
-       LEFT JOIN all_tab_privs pr\
-       ON d.directory_name = pr.table_name\
-          AND d.owner = pr.table_schema\
-          AND pr.grantee = USER\
-          AND pr.privilege = 'READ'\
-       LEFT JOIN all_tab_privs pw\
-       ON d.directory_name = pw.table_name\
-          AND d.owner = pr.table_schema\
-          AND pw.grantee = USER\
+SELECT d.directory_name,\n\
+       d.directory_path,\n\
+       pr.grantable,\n\
+       pw.grantable\n\
+  FROM all_directories d\n\
+       LEFT JOIN all_tab_privs pr\n\
+       ON d.directory_name = pr.table_name\n\
+          AND d.owner = pr.table_schema\n\
+          AND pr.grantee = USER\n\
+          AND pr.privilege = 'READ'\n\
+       LEFT JOIN all_tab_privs pw\n\
+       ON d.directory_name = pw.table_name\n\
+          AND d.owner = pr.table_schema\n\
+          AND pw.grantee = USER\n\
           AND pw.privilege = 'WRITE'",
 	       0, NO_BIND_VARIABLES, oraDefinesLsDir };
 

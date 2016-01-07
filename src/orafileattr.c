@@ -37,18 +37,21 @@ void GetOracleFileAttr(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, cha
 	};
 
 	struct ORACLESTATEMENT oraStmtFattr = { "\
-declare \
-  exists_ BOOLEAN; \
-  length_ NUMBER; \
-  blocksize_ NUMBER; \
-begin \
-  utl_file.fgetattr(:directory, :filename, exists_, length_, blocksize_); \
-  if not exists_ and length_ is null then \
-    :length := 0; \
-  else \
-    :length := length_; \
-  end if; \
-  :exists := case when exists_ then 1 else 0 end; \
+declare\n\
+  exists_ BOOLEAN;\n\
+  length_ NUMBER;\n\
+  blocksize_ NUMBER;\n\
+begin\n\
+  utl_file.fgetattr(:directory, :filename, exists_, length_, blocksize_);\n\
+  if not exists_ and length_ is null then\n\
+    :length := 0;\n\
+  else\n\
+    :length := length_;\n\
+  end if;\n\
+  :exists := case when exists_\n\
+                  then 1\n\
+                  else 0\n\
+             end;\n\
 end;",
 	       0, bindVariablesFattr, NO_ORACLE_DEFINES };
 

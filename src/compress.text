@@ -1,0 +1,61 @@
+"DECLARE\n\
+	f_handle UTL_FILE.FILE_TYPE;\n\
+	c_handle BINARY_INTEGER;\n\
+	raw_buffer RAW(32767);\n\
+	blob_buffer BLOB;\n\
+	actual_size NUMBER;\n\
+	pos NUMBER;\n\
+	blobsize NUMBER;\n\
+	rindex BINARY_INTEGER;\n\
+	slno BINARY_INTEGER;\n\
+	target NUMBER;\n\
+	exists_ BOOLEAN;\n\
+	file_length NUMBER;\n\
+	blocksize NUMBER;\n\
+BEGIN\n\
+	utl_file.fgetattr(:directory, :original_filename, exists_, file_length, blocksize);\n\
+	rindex := dbms_application_info.set_session_longops_nohint;\n\
+	select object_id\n\
+	  into target\n\
+	  from all_objects\n\
+	 where object_type = 'DIRECTORY'\n\
+	       and object_name = :directory;\n\
+	f_handle := UTL_FILE.FOPEN(:directory, :original_filename, 'rb');\n\
+	pos := 0;\n\
+	DBMS_LOB.CREATETEMPORARY(blob_buffer, TRUE, DBMS_LOB.CALL);\n\
+	IF :compression_level > 0 THEN\n\
+		c_handle := UTL_COMPRESS.LZ_COMPRESS_OPEN(blob_buffer, :compression_level);\n\
+	ELSE\n\
+		c_handle := UTL_COMPRESS.LZ_COMPRESS_OPEN(blob_buffer);\n\
+	END IF;\n\
+	LOOP\n\
+		BEGIN\n\
+			UTL_FILE.GET_RAW(f_handle, raw_buffer, 16384);\n\
+			UTL_COMPRESS.LZ_COMPRESS_ADD(c_handle, blob_buffer, raw_buffer);\n\
+			pos := pos + utl_raw.length(raw_buffer);\n\
+			dbms_application_info.set_session_longops(rindex, slno, 'GZIP', target, 0, pos, file_length, :directory || ':' || :original_filename, 'bytes');\n\
+		EXCEPTION\n\
+			WHEN NO_DATA_FOUND THEN\n\
+				EXIT;\n\
+		END;\n\
+	END LOOP;\n\
+	UTL_COMPRESS.LZ_COMPRESS_CLOSE(c_handle, blob_buffer);\n\
+	UTL_FILE.FCLOSE(f_handle);\n\
+\n\
+	f_handle := UTL_FILE.FOPEN(:directory, :compressed_filename, 'wb');\n\
+	pos := 0;\n\
+	blobsize := DBMS_LOB.GETLENGTH(blob_buffer);\n\
+	rindex := dbms_application_info.set_session_longops_nohint;\n\
+	WHILE pos < blobsize LOOP\n\
+		actual_size := LEAST(blobsize - pos, 16384);\n\
+		DBMS_LOB.READ(blob_buffer, actual_size, pos + 1, raw_buffer);\n\
+		UTL_FILE.PUT_RAW(f_handle, raw_buffer);\n\
+		pos := pos + actual_size;\n\
+		dbms_application_info.set_session_longops(rindex, slno, 'WRITE LOB TO FILE', target, 0, pos, blobsize, :directory || ':' || :original_filename, 'bytes');\n\
+	END LOOP;\n\
+	DBMS_LOB.FREETEMPORARY(blob_buffer);\n\
+	UTL_FILE.FCLOSE(f_handle);\n\
+	IF :keep = 0 THEN\n\
+		UTL_FILE.FREMOVE(:directory, :original_filename);\n\
+	END IF;\n\
+END;"

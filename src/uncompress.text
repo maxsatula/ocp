@@ -1,0 +1,58 @@
+"DECLARE\n\
+	f_handle UTL_FILE.FILE_TYPE;\n\
+	c_handle BINARY_INTEGER;\n\
+	raw_buffer RAW(32767);\n\
+	blob_buffer BLOB;\n\
+	pos NUMBER;\n\
+	rindex BINARY_INTEGER;\n\
+	slno BINARY_INTEGER;\n\
+	target NUMBER;\n\
+	exists_ BOOLEAN;\n\
+	file_length NUMBER;\n\
+	blocksize NUMBER;\n\
+BEGIN\n\
+	utl_file.fgetattr(:directory, :original_filename, exists_, file_length, blocksize);\n\
+	rindex := dbms_application_info.set_session_longops_nohint;\n\
+	select object_id\n\
+	  into target\n\
+	  from all_objects\n\
+	 where object_type = 'DIRECTORY'\n\
+	       and object_name = :directory;\n\
+	DBMS_LOB.CREATETEMPORARY(blob_buffer, TRUE, DBMS_LOB.CALL);\n\
+	f_handle := UTL_FILE.FOPEN(:directory, :original_filename, 'rb');\n\
+	pos := 0;\n\
+	LOOP\n\
+		BEGIN\n\
+			UTL_FILE.GET_RAW(f_handle, raw_buffer, 16384);\n\
+			DBMS_LOB.WRITEAPPEND(blob_buffer, UTL_RAW.LENGTH(raw_buffer), raw_buffer);\n\
+			pos := pos + utl_raw.length(raw_buffer);\n\
+			dbms_application_info.set_session_longops(rindex, slno, 'READ LOB FROM FILE', target, 0, pos, file_length, :directory || ':' || :original_filename, 'bytes');\n\
+		EXCEPTION\n\
+			WHEN NO_DATA_FOUND THEN\n\
+				EXIT;\n\
+		END;\n\
+	END LOOP;\n\
+	UTL_FILE.FCLOSE(f_handle);\n\
+\n\
+	rindex := dbms_application_info.set_session_longops_nohint;\n\
+	c_handle := UTL_COMPRESS.LZ_UNCOMPRESS_OPEN(blob_buffer);\n\
+	f_handle := UTL_FILE.FOPEN(:directory, :uncompressed_filename, 'wb');\n\
+	pos := 0;\n\
+	LOOP\n\
+		BEGIN\n\
+			UTL_COMPRESS.LZ_UNCOMPRESS_EXTRACT(c_handle, raw_buffer);\n\
+			UTL_FILE.PUT_RAW(f_handle, raw_buffer);\n\
+			pos := pos + utl_raw.length(raw_buffer);\n\
+			dbms_application_info.set_session_longops(rindex, slno, 'GUNZIP', target, 0, pos, file_length, :directory || ':' || :original_filename, 'bytes');\n\
+		EXCEPTION\n\
+			WHEN NO_DATA_FOUND THEN\n\
+				EXIT;\n\
+		END;\n\
+	END LOOP;\n\
+	UTL_FILE.FCLOSE(f_handle);\n\
+	UTL_COMPRESS.LZ_UNCOMPRESS_CLOSE(c_handle);\n\
+	DBMS_LOB.FREETEMPORARY(blob_buffer);\n\
+	IF :keep = 0 THEN\n\
+		UTL_FILE.FREMOVE(:directory, :original_filename);\n\
+	END IF;\n\
+END;"

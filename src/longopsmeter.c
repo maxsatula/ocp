@@ -100,21 +100,21 @@ static struct ORACLEDEFINE oraDefinesWatchLongops[] =
 };
 
 	static struct ORACLESTATEMENT oraStmtWatchLongops = { "\
-select opname,\
-       target_desc,\
-       sofar,\
-       totalwork,\
-       time_remaining,\
-       elapsed_seconds\
-  from gv$session_longops\
- where sid = :sid\
-       and inst_id = :instance\
-       and sofar < totalwork\
-       and serial# = (select distinct first_value(serial#) over (order by start_time desc)\
-                        from gv$session_longops\
-                       where sid = :sid\
-                             and inst_id = :instance)\
-order by\
+select opname,\n\
+       target_desc,\n\
+       sofar,\n\
+       totalwork,\n\
+       time_remaining,\n\
+       elapsed_seconds\n\
+  from gv$session_longops\n\
+ where sid = :sid\n\
+       and inst_id = :instance\n\
+       and sofar < totalwork\n\
+       and serial# = (select distinct first_value(serial#) over (order by start_time desc)\n\
+                        from gv$session_longops\n\
+                       where sid = :sid\n\
+                             and inst_id = :instance)\n\
+order by\n\
        totalwork - sofar\
 ",
 		0, oraBindsWatchLongops, oraDefinesWatchLongops };

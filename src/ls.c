@@ -59,12 +59,12 @@ void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* patter
 
 	struct ORACLESTATEMENT oraStmtLs = {
 	       "\
-SELECT t.file_name,\
-       t.bytes,\
-       t.last_modified,\
-       t.digest\
-  FROM all_directories d,\
-       TABLE(f_ocp_dir_list(d.directory_path, :patterns, :hash_algorithm)) t\
+SELECT t.file_name,\n\
+       t.bytes,\n\
+       t.last_modified,\n\
+       t.digest\n\
+  FROM all_directories d,\n\
+       TABLE(f_ocp_dir_list(d.directory_path, :patterns, :hash_algorithm)) t\n\
  WHERE d.directory_name = :directory",
 	       0, oraBindsLs, oraDefinesLs };
 

@@ -351,8 +351,8 @@ void GetSessionId(struct ORACLEALLINONE *oraAllInOne, struct ORACLESESSIONID *or
         };
 
 	struct ORACLESTATEMENT oraStmtGetSid = { "\
-select sys_context('USERENV', 'SID'),\
-       sys_context('USERENV', 'INSTANCE')\
+select sys_context('USERENV', 'SID'),\n\
+       sys_context('USERENV', 'INSTANCE')\n\
   from dual",
 		0, NO_BIND_VARIABLES, oraDefinesGetSid };
 

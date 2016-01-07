@@ -1,3 +1,7 @@
+2016-01-06  Max Satula <maksym.satula@gmail.com>
+
+* Some code refactoring
+
 2016-01-01  Max Satula <maksym.satula@gmail.com>
 
 * Add ability to calculate MD5 or SHA1 digests in --ls

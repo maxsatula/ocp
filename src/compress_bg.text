@@ -1,0 +1,81 @@
+"DECLARE\n\
+	safe_directory_ varchar2(60);\n\
+	safe_compression_level_ varchar2(1);\n\
+	safe_original_filename_ varchar2(512);\n\
+	safe_compressed_filename_ varchar2(512);\n\
+BEGIN\n\
+	safe_directory_ := dbms_assert.enquote_literal(''''||replace(:directory, '''', '''''')||'''');\n\
+	safe_compression_level_ := to_char(:compression_level, 'TM', 'NLS_Numeric_Characters = ''.,''');\n\
+	safe_original_filename_ := dbms_assert.enquote_literal(''''||replace(:original_filename, '''', '''''')||'''');\n\
+	safe_compressed_filename_ := dbms_assert.enquote_literal(''''||replace(:compressed_filename, '''', '''''')||'''');\n\
+\n\
+	:job_name := dbms_scheduler.generate_job_name('OCP_GZIP_');\n\
+	dbms_scheduler.create_job (\n\
+		job_name => :job_name,\n\
+		job_type => 'PLSQL_BLOCK',\n\
+		enabled => TRUE,\n\
+		comments => 'ocp compression job',\n\
+		job_action => '\n\
+DECLARE\n\
+	f_handle UTL_FILE.FILE_TYPE;\n\
+	c_handle BINARY_INTEGER;\n\
+	raw_buffer RAW(32767);\n\
+	blob_buffer BLOB;\n\
+	actual_size NUMBER;\n\
+	pos NUMBER;\n\
+	blobsize NUMBER;\n\
+	rindex BINARY_INTEGER;\n\
+	slno BINARY_INTEGER;\n\
+	target NUMBER;\n\
+	exists_ BOOLEAN;\n\
+	file_length NUMBER;\n\
+	blocksize NUMBER;\n\
+BEGIN\n\
+	utl_file.fgetattr(' || safe_directory_ || ', ' || safe_original_filename_ || ', exists_, file_length, blocksize);\n\
+	rindex := dbms_application_info.set_session_longops_nohint;\n\
+	select object_id\n\
+	  into target\n\
+	  from all_objects\n\
+	 where object_type = ''DIRECTORY''\n\
+	       and object_name = ' || safe_directory_ || ';\n\
+	f_handle := UTL_FILE.FOPEN(' || safe_directory_ || ', ' || safe_original_filename_ || ', ''rb'');\n\
+	pos := 0;\n\
+	DBMS_LOB.CREATETEMPORARY(blob_buffer, TRUE, DBMS_LOB.CALL);\n\
+	' || case when :compression_level > 0 then\n\
+		'c_handle := UTL_COMPRESS.LZ_COMPRESS_OPEN(blob_buffer, ' || safe_compression_level_ || ');'\n\
+	else\n\
+		'c_handle := UTL_COMPRESS.LZ_COMPRESS_OPEN(blob_buffer);'\n\
+	end || '\n\
+	LOOP\n\
+		BEGIN\n\
+			UTL_FILE.GET_RAW(f_handle, raw_buffer, 16384);\n\
+			UTL_COMPRESS.LZ_COMPRESS_ADD(c_handle, blob_buffer, raw_buffer);\n\
+			pos := pos + utl_raw.length(raw_buffer);\n\
+			dbms_application_info.set_session_longops(rindex, slno, ''GZIP'', target, 0, pos, file_length, ' || safe_directory_ || ' || '':'' || ' || safe_original_filename_ || ', ''bytes'');\n\
+		EXCEPTION\n\
+			WHEN NO_DATA_FOUND THEN\n\
+				EXIT;\n\
+		END;\n\
+	END LOOP;\n\
+	UTL_COMPRESS.LZ_COMPRESS_CLOSE(c_handle, blob_buffer);\n\
+	UTL_FILE.FCLOSE(f_handle);\n\
+\n\
+	f_handle := UTL_FILE.FOPEN(' || safe_directory_ || ', ' || safe_compressed_filename_ || ', ''wb'');\n\
+	pos := 0;\n\
+	blobsize := DBMS_LOB.GETLENGTH(blob_buffer);\n\
+	rindex := dbms_application_info.set_session_longops_nohint;\n\
+	WHILE pos < blobsize LOOP\n\
+		actual_size := LEAST(blobsize - pos, 16384);\n\
+		DBMS_LOB.READ(blob_buffer, actual_size, pos + 1, raw_buffer);\n\
+		UTL_FILE.PUT_RAW(f_handle, raw_buffer);\n\
+		pos := pos + actual_size;\n\
+		dbms_application_info.set_session_longops(rindex, slno, ''WRITE LOB TO FILE'', target, 0, pos, blobsize, ' || safe_directory_ || ' || '':'' || ' || safe_original_filename_ || ', ''bytes'');\n\
+	END LOOP;\n\
+	DBMS_LOB.FREETEMPORARY(blob_buffer);\n\
+	UTL_FILE.FCLOSE(f_handle);\n\
+	' || case when :keep = 0 then\n\
+		'UTL_FILE.FREMOVE(' || safe_directory_ || ', ' || safe_original_filename_ || ');'\n\
+	end || '\n\
+END;\n\
+');\n\
+END;"
