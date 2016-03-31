@@ -81,13 +81,13 @@ cat << EOF
 
 EOF
 
-grep -Pzo '(\w+)(\s*)monotime(.+)\)' progressmeter/misc.c.orig
+grep -Ezo '(\w+)(\s*)monotime_double([^)]*)\)' progressmeter/misc.c.orig
 
 cat << EOF
 ; /* taken from the original OpenSSH misc.h/misc.c */
 EOF
 
-grep -Pzo '(\w+)(\s*)strlcat(.+)\)' progressmeter/strlcat.c.orig
+grep -Ezo '(\w+)(\s*)strlcat([^)]*)\)' progressmeter/strlcat.c.orig
 
 cat << EOF
 ; /* declaration for strlcat.c */
@@ -112,7 +112,7 @@ cat << EOF
 #include <time.h>
 
 EOF
-grep -Pzo '(\w+)(\s*)monotime(.+)([^}]*)}' ${filename} | sed \
+grep -Ezo '(\w+)(\s*)monotime_double([^}]*)}' ${filename} | sed \
 	-e 's/if (/\/*if (*\//' \
 	-e 's/ != 0)/\/* != 0)/' \
 	-e 's/strerror(errno))/strerror(errno))*\//'
