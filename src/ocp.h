@@ -55,7 +55,7 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
                                int isKeepPartial, int isResume);
 
 void LsDir(struct ORACLEALLINONE *oraAllInOne);
-void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* patterns, int patternLength, enum HASH_ALGORITHM hashAlgorithm);
+void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, char* patterns, int patternLength, enum HASH_ALGORITHM hashAlgorithm);
 void Rm(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, char* pFileName);
 
 void InstallObjects(struct ORACLEALLINONE* oraAllInOne);

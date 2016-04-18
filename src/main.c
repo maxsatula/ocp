@@ -44,7 +44,7 @@ enum TRANSFER_MODE { TRANSFER_MODE_INTERACTIVE, TRANSFER_MODE_OVERWRITE, TRANSFE
 struct PROGRAM_OPTIONS
 {
 	enum PROGRAM_ACTION programAction;
-	const char* lsDirectoryName;
+	char* lsDirectoryName;
 	int compressionLevel;
 	int isBackground;
 	int isKeepPartial;

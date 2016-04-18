@@ -27,7 +27,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "oracle.h"
 #include "ocp.h"
 
-void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* patterns, int patternLength, enum HASH_ALGORITHM hashAlgorithm)
+void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, char* patterns, int patternLength, enum HASH_ALGORITHM hashAlgorithm)
 {
 	sword ociResult;
 	char vFileName[MAX_FMT_SIZE];

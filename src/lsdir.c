@@ -73,8 +73,8 @@ SELECT d.directory_name,\n\
 			   *(char*)oraStmtLsDir.oraDefines[2].value == 'Y' ? 'R' : 'r',
 			   oraStmtLsDir.oraDefines[3].indp == -1 ? '-' :
 			   *(char*)oraStmtLsDir.oraDefines[3].value == 'Y' ? 'W' : 'w',
-			   oraStmtLsDir.oraDefines[0].value,
-			   oraStmtLsDir.oraDefines[1].value);
+			   (char*)oraStmtLsDir.oraDefines[0].value,
+			   (char*)oraStmtLsDir.oraDefines[1].value);
 
 		ociResult = OCIStmtFetch2(oraStmtLsDir.stmthp, oraAllInOne->errhp, 1,
 								  OCI_FETCH_NEXT, 1, OCI_DEFAULT);
