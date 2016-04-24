@@ -8,10 +8,10 @@ Here are dependencies required to run pre-compiled `ocp.exe`
 
 ### Oracle Client
 
-Download and unpack Oracle **Instant Client Package - Basic Lite** for Microsoft Windows (32-bit) version 11.2.0.4.0 from http://www.oracle.com/technetwork/topics/winsoft-085727.html
-`instantclient-basiclite-nt-11.2.0.4.0.zip` (20,258,449 bytes)
+Download and unpack Oracle **Instant Client Package - Basic Lite** for Microsoft Windows (32-bit) version 12.1.0.2.0 from http://www.oracle.com/technetwork/topics/winsoft-085727.html
+`instantclient-basiclite-nt-12.1.0.2.0.zip` (33,851,306 bytes)
 
-Full Oracle Client (or Server) installations should also work, as well as newer versions (12c). Use 32-bit installations only.
+Full Oracle Client (or Server) installations will also work. Use 32-bit installations only.
 
 As usual, make sure Oracle Instant Client directory is in `PATH` environment variable. If using full installation, then `%ORACLE_HOME%\bin` should be in `PATH`.
 
@@ -25,19 +25,25 @@ Download and unpack archives, and put files to a directory with `ocp.exe` or to 
 | http://gnuwin32.sourceforge.net/downlinks/popt-dep-zip.php | popt-1.8-1-dep.zip | bin\binlibintl-2.dll, bin\libiconv-2.dll |
 | http://gnuwin32.sourceforge.net/downlinks/zlib-bin-zip.php | zlib-1.2.3-bin.zip | bin\zlib1.dll |
 
-### Visual C++ Redistributable Package for Visual Studio 2013  
+### Microsoft Visual C++ 2010 SP1 Redistributable Package (x86)
 
-Download and install `vcredist_x86.exe` from http://www.microsoft.com/en-US/download/details.aspx?id=40784
+Download and install `vcredist_x86.exe` from https://www.microsoft.com/en-us/download/details.aspx?id=8328
+
+This dependency has nothing to do with `ocp` itself, it makes Oracle Instant Client 12c work.
+
+### Visual C++ Redistributable for Visual Studio 2015
+
+Download and install `vc_redist.x86.exe` from https://www.microsoft.com/en-us/download/details.aspx?id=48145
 
 Build
 -----
 
-Here are dependencies required to compile `ocp.exe` from source. Please follow instructions in **Runtime** section above (except **Visual C++ Redistributable Package**, that one is automatically supplied by **Visual Studio**  installation), then proceed with steps below.
+Here are dependencies required to compile `ocp.exe` from source. Please follow instructions in **Runtime** section above (except **Visual C++ Redistributable for Visual Studio 2015**, that one is automatically supplied by **Microsoft Visual C++ Build Tools 2015**  installation), then proceed with the steps below.
 
 ### Oracle Client
 
-If using Instant Client, download and unpack to the same directory Oracle **Instant Client Package - SDK** for Microsoft Windows (32-bit) version 11.2.0.4.0 from http://www.oracle.com/technetwork/topics/winsoft-085727.html
-`instantclient-sdk-nt-11.2.0.4.0.zip` (1,114,946 bytes)
+If using Instant Client, download and unpack to the same directory Oracle **Instant Client Package - SDK** for Microsoft Windows (32-bit) version 12.1.0.2.0 from http://www.oracle.com/technetwork/topics/winsoft-085727.html
+`instantclient-sdk-nt-12.1.0.2.0.zip` (1,951,770 bytes)
 
 ### GnuWin32 Libraries
 
@@ -48,11 +54,23 @@ Download and unpack archives to `win` subdirectory of ocp source tree:
 | http://gnuwin32.sourceforge.net/downlinks/popt-lib-zip.php | popt-1.8-1-lib.zip |
 | http://gnuwin32.sourceforge.net/downlinks/zlib-lib-zip.php | zlib-1.2.3-lib.zip |
 
-### Visual Studio Express 2013 for Windows Desktop
+### Microsoft .NET Framework 4.6.1
 
-Downloand and install from https://www.visualstudio.com/en-us/products/visual-studio-express-vs.aspx
+This is a requirement for successful installation of **Microsoft Visual C++ Build Tools 2015**, nothing to do with `ocp` itself.
+
+Skip this step if Windows 10, do not skip if installation of **Microsoft Visual C++ Build Tools 2015** aborts because of missing .NET Framework.
+
+Download and install from https://www.microsoft.com/en-us/download/details.aspx?id=49982
+
+### Microsoft Visual C++ Build Tools 2015
+
+Downloand and install from https://www.visualstudio.com/downloads/download-visual-studio-vs
+
+Installation selection of *Typical*.
 
 ### Run Compilation
+
+Run **VS2015 x86 Native Tools Command Prompt**
 
 Then review `win\build.cmd`, edit if necessary, and execute:
 ```

@@ -3,7 +3,7 @@ rem
 rem 1. Review and edit include\config.h (update version information) if necessary
 rem 2. Adjust the two variables (%INSTANT_CLIENT% and %OCP_ROOT%) if necessary
 
-set INSTANT_CLIENT=c:\instantclient_11_2
+set INSTANT_CLIENT=c:\instantclient_12_1
 set OCP_ROOT=..
 
 set ICINCHOME=%INSTANT_CLIENT%\sdk\include
