@@ -34,6 +34,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "ocp.h"
 #ifndef _WIN32
 # include "progressmeter.h"
+# include "longopsmeter.h"
 #endif
 
 void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirectory,
