@@ -1,4 +1,4 @@
-/* $OpenBSD: misc.c,v 1.102 2016/03/02 22:42:40 dtucker Exp $ */
+/* $OpenBSD: misc.c,v 1.107 2016/11/30 00:28:31 dtucker Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2005,2006 Damien Miller.  All rights reserved.

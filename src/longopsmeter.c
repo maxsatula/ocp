@@ -196,10 +196,10 @@ refresh_longops_meter(void)
 	}
 
 	/* percent of transfer done */
-	if (vTotalWork != 0)
-		percent = ((float)vSoFar / vTotalWork) * 100;
-	else
+	if (vTotalWork == 0 || vSoFar == vTotalWork)
 		percent = 100;
+	else
+		percent = ((float)vSoFar / vTotalWork) * 100;
 	snprintf(buf + strlen(buf), win_size - strlen(buf),
 	    " %3d%% ", percent);
 
