@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([ocp],[0.1],[Max Satula <maksym.satula@gmail.com>])
+AC_INIT([ocp],[0.2],[Max Satula <maksym.satula@gmail.com>])
 AM_INIT_AUTOMAKE
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([src/ocp.h])
