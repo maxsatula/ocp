@@ -138,6 +138,10 @@ int main(int argc, const char *argv[])
 	struct ORACLEFILEATTR oracleFileAttr;
 	poptContext poptcon;
 	int rc;
+#ifdef _WIN32
+	DWORD mode;
+	char passBuffer[50];
+#endif
 
 	struct poptOption transferModeOptions[] =
 	{
@@ -445,8 +449,7 @@ int main(int argc, const char *argv[])
 	if (!pwdptr)
 		pwdptr = getpass("Password: ");
 #else
-	DWORD mode = 0;
-	char passBuffer[50];
+	mode = 0;
 	if (!pwdptr)
 	{
 		HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);

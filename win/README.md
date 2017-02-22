@@ -22,23 +22,20 @@ Download and unpack archives, and put files to a directory with `ocp.exe` or to 
 | URL                                                        | Archive name       | File(s)       |
 |------------------------------------------------------------|--------------------|---------------|
 | http://gnuwin32.sourceforge.net/downlinks/popt-bin-zip.php | popt-1.8-1-bin.zip | bin\popt1.dll |
-| http://gnuwin32.sourceforge.net/downlinks/popt-dep-zip.php | popt-1.8-1-dep.zip | bin\binlibintl-2.dll, bin\libiconv-2.dll |
+| http://gnuwin32.sourceforge.net/downlinks/popt-dep-zip.php | popt-1.8-1-dep.zip | bin\libintl-2.dll, bin\libiconv-2.dll |
 | http://gnuwin32.sourceforge.net/downlinks/zlib-bin-zip.php | zlib-1.2.3-bin.zip | bin\zlib1.dll |
 
 ### Microsoft Visual C++ 2010 SP1 Redistributable Package (x86)
 
 Download and install `vcredist_x86.exe` from https://www.microsoft.com/en-us/download/details.aspx?id=8328
 
-This dependency has nothing to do with `ocp` itself, it makes Oracle Instant Client 12c work.
-
-### Visual C++ Redistributable for Visual Studio 2015
-
-Download and install `vc_redist.x86.exe` from https://www.microsoft.com/en-us/download/details.aspx?id=48145
-
 Build
 -----
 
-Here are dependencies required to compile `ocp.exe` from source. Please follow instructions in **Runtime** section above (except **Visual C++ Redistributable for Visual Studio 2015**, that one is automatically supplied by **Microsoft Visual C++ Build Tools 2015**  installation), then proceed with the steps below.
+Here are dependencies required to compile `ocp.exe` from source. Please follow instructions in **Runtime** section above (except **Microsoft Visual C++ 2010 SP1 Redistributable Package (x86)**, that one is automatically supplied by **Microsoft Visual C++ 2010 Express SP1**  installation), then proceed with the steps below.
+
+A version 2010 of Visual C++ (MSVC) was chosen because Oracle Instant Client 12.1.0.2.0 already has **Microsoft Visual C++ 2010 SP1 Redistributable Package (x86)** as its runtime dependency (it requires `MSVCR100.dll` file).
+Thus, compiling `ocp` with the same MSVC version as Oracle used for their Instant Client will avoid dependencies on more than one version of `MSVCR*.dll`.
 
 ### Oracle Client
 
@@ -54,23 +51,15 @@ Download and unpack archives to `win` subdirectory of ocp source tree:
 | http://gnuwin32.sourceforge.net/downlinks/popt-lib-zip.php | popt-1.8-1-lib.zip |
 | http://gnuwin32.sourceforge.net/downlinks/zlib-lib-zip.php | zlib-1.2.3-lib.zip |
 
-### Microsoft .NET Framework 4.6.1
+### Microsoft Visual C++ 2010 Express SP1
 
-This is a requirement for successful installation of **Microsoft Visual C++ Build Tools 2015**, nothing to do with `ocp` itself.
-
-Skip this step if Windows 10, do not skip if installation of **Microsoft Visual C++ Build Tools 2015** aborts because of missing .NET Framework.
-
-Download and install from https://www.microsoft.com/en-us/download/details.aspx?id=49982
-
-### Microsoft Visual C++ Build Tools 2015
-
-Downloand and install from https://www.visualstudio.com/downloads/download-visual-studio-vs
-
-Installation selection of *Typical*.
+  1. Download and install **Microsoft Visual C++ 2010 Express**,
+	 deselect any options during installation, as they are unnecessary.
+  2. Download and install **Microsoft Visual Studio 2010 Service Pack 1**
 
 ### Run Compilation
 
-Run **VS2015 x86 Native Tools Command Prompt**
+Run **Visual Studio Command Prompt (2010)**
 
 Then review `win\build.cmd`, edit if necessary, and execute:
 ```
