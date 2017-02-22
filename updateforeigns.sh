@@ -45,18 +45,21 @@ download "http://git.savannah.gnu.org/gitweb/?p=gnulib.git;a=blob_plain;f=lib/ye
          yesno/yesno.h
 download "http://git.savannah.gnu.org/gitweb/?p=gnulib.git;a=blob_plain;f=lib/yesno.c;hb=HEAD" \
          yesno/yesno.c
+download "https://raw.githubusercontent.com/rtyley/globs-for-java/master/src/main/java/com/madgag/globs/openjdk/Globs.java" \
+         src/Globs.java.orig
 
 # 2. Apply patches
 
 # 2.1. Easy case, sources work well unmodified
 
-for file in progressmeter.h atomicio.h strlcat.c; do
+for file in progressmeter.h atomicio.h; do
 	cp progressmeter/${file}.orig progressmeter/${file}
 done
 
 # 2.2. Medium case, sources need a slight patch
 
-for file in progressmeter/progressmeter.c progressmeter/atomicio.c m4/ax_lib_oracle_oci.m4; do
+for file in progressmeter/progressmeter.c progressmeter/atomicio.c progressmeter/strlcat.c \
+        m4/ax_lib_oracle_oci.m4 src/Globs.java; do
 	patch --backup-if-mismatch -u -o ${file} ${file}.orig ${file}.patch
 done
 
@@ -78,13 +81,13 @@ cat << EOF
 
 EOF
 
-grep -Pzo '(\w+)(\s*)monotime(.+)\)' progressmeter/misc.c.orig
+grep -Ezo '(\w+)(\s*)monotime_double([^)]*)\)' progressmeter/misc.c.orig
 
 cat << EOF
 ; /* taken from the original OpenSSH misc.h/misc.c */
 EOF
 
-grep -Pzo '(\w+)(\s*)strlcat(.+)\)' progressmeter/strlcat.c.orig
+grep -Ezo '(\w+)(\s*)strlcat([^)]*)\)' progressmeter/strlcat.c.orig
 
 cat << EOF
 ; /* declaration for strlcat.c */
@@ -109,7 +112,7 @@ cat << EOF
 #include <time.h>
 
 EOF
-grep -Pzo '(\w+)(\s*)monotime(.+)([^}]*)}' ${filename} | sed \
+grep -Ezo '(\w+)(\s*)monotime_double([^}]*)}' ${filename} | sed \
 	-e 's/if (/\/*if (*\//' \
 	-e 's/ != 0)/\/* != 0)/' \
 	-e 's/strerror(errno))/strerror(errno))*\//'
@@ -123,5 +126,6 @@ rm progressmeter/progressmeter.h.orig \
    progressmeter/atomicio.c.orig \
    progressmeter/misc.c.orig \
    progressmeter/strlcat.c.orig \
-   m4/ax_lib_oracle_oci.m4.orig
+   m4/ax_lib_oracle_oci.m4.orig \
+   src/Globs.java.orig
 

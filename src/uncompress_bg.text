@@ -1,0 +1,76 @@
+"DECLARE\n\
+	safe_directory_ varchar2(60);\n\
+	safe_original_filename_ varchar2(512);\n\
+	safe_uncompressed_filename_ varchar2(512);\n\
+BEGIN\n\
+	safe_directory_ := dbms_assert.enquote_literal(''''||replace(:directory, '''', '''''')||'''');\n\
+	safe_original_filename_ := dbms_assert.enquote_literal(''''||replace(:original_filename, '''', '''''')||'''');\n\
+	safe_uncompressed_filename_ := dbms_assert.enquote_literal(''''||replace(:uncompressed_filename, '''', '''''')||'''');\n\
+\n\
+	:job_name := dbms_scheduler.generate_job_name('OCP_GUNZIP_');\n\
+	dbms_scheduler.create_job (\n\
+		job_name => :job_name,\n\
+		job_type => 'PLSQL_BLOCK',\n\
+		enabled => TRUE,\n\
+		comments => 'ocp decompression job',\n\
+		job_action => '\n\
+DECLARE\n\
+	f_handle UTL_FILE.FILE_TYPE;\n\
+	c_handle BINARY_INTEGER;\n\
+	raw_buffer RAW(32767);\n\
+	blob_buffer BLOB;\n\
+	pos NUMBER;\n\
+	rindex BINARY_INTEGER;\n\
+	slno BINARY_INTEGER;\n\
+	target NUMBER;\n\
+	exists_ BOOLEAN;\n\
+	file_length NUMBER;\n\
+	blocksize NUMBER;\n\
+BEGIN\n\
+	utl_file.fgetattr(' || safe_directory_ || ', ' || safe_original_filename_ || ', exists_, file_length, blocksize);\n\
+	rindex := dbms_application_info.set_session_longops_nohint;\n\
+	select object_id\n\
+	  into target\n\
+	  from all_objects\n\
+	 where object_type = ''DIRECTORY''\n\
+	       and object_name = ' || safe_directory_ || ';\n\
+	DBMS_LOB.CREATETEMPORARY(blob_buffer, TRUE, DBMS_LOB.CALL);\n\
+	f_handle := UTL_FILE.FOPEN(' || safe_directory_ || ', ' || safe_original_filename_ || ', ''rb'');\n\
+	pos := 0;\n\
+	LOOP\n\
+		BEGIN\n\
+			UTL_FILE.GET_RAW(f_handle, raw_buffer, 16384);\n\
+			DBMS_LOB.WRITEAPPEND(blob_buffer, UTL_RAW.LENGTH(raw_buffer), raw_buffer);\n\
+			pos := pos + utl_raw.length(raw_buffer);\n\
+			dbms_application_info.set_session_longops(rindex, slno, ''READ LOB FROM FILE'', target, 0, pos, file_length, ' || safe_directory_ || ' || '':'' || ' || safe_original_filename_ || ', ''bytes'');\n\
+		EXCEPTION\n\
+			WHEN NO_DATA_FOUND THEN\n\
+				EXIT;\n\
+		END;\n\
+	END LOOP;\n\
+	UTL_FILE.FCLOSE(f_handle);\n\
+\n\
+	rindex := dbms_application_info.set_session_longops_nohint;\n\
+	c_handle := UTL_COMPRESS.LZ_UNCOMPRESS_OPEN(blob_buffer);\n\
+	f_handle := UTL_FILE.FOPEN(' || safe_directory_ || ', ' || safe_uncompressed_filename_ || ', ''wb'');\n\
+	pos := 0;\n\
+	LOOP\n\
+		BEGIN\n\
+			UTL_COMPRESS.LZ_UNCOMPRESS_EXTRACT(c_handle, raw_buffer);\n\
+			UTL_FILE.PUT_RAW(f_handle, raw_buffer);\n\
+			pos := pos + utl_raw.length(raw_buffer);\n\
+			dbms_application_info.set_session_longops(rindex, slno, ''GUNZIP'', target, 0, pos, file_length, ' || safe_directory_ || ' || '':'' || ' || safe_original_filename_ || ', ''bytes'');\n\
+		EXCEPTION\n\
+			WHEN NO_DATA_FOUND THEN\n\
+				EXIT;\n\
+		END;\n\
+	END LOOP;\n\
+	UTL_FILE.FCLOSE(f_handle);\n\
+	UTL_COMPRESS.LZ_UNCOMPRESS_CLOSE(c_handle);\n\
+	DBMS_LOB.FREETEMPORARY(blob_buffer);\n\
+	' || case when :keep = 0 then\n\
+		'UTL_FILE.FREMOVE(' || safe_directory_ || ', ' || safe_original_filename_ || ');'\n\
+	end || '\n\
+END;\n\
+');\n\
+END;"

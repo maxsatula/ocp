@@ -35,48 +35,21 @@ CREATE OR REPLACE\n\
 	TYPE t_ocp_file AS OBJECT (\n\
 	file_name VARCHAR2(200),\n\
 	bytes NUMBER,\n\
-	last_modified DATE);" },
+	last_modified DATE,\n\
+	digest RAW(20));" },
 		{ "\
 CREATE OR REPLACE\n\
 	TYPE t_ocp_file_list IS TABLE OF t_ocp_file" },
+		{
+#include "j_ocp_DirList.text"
+#include "Globs.text"
+	},
 		{ "\
 CREATE OR REPLACE\n\
-	AND COMPILE\n\
-	JAVA SOURCE NAMED \"j_ocp_DirList\"\n\
-AS\n\
-import java.io.File;\n\
-import java.sql.Connection;\n\
-import java.sql.SQLException;\n\
-import java.sql.Timestamp;\n\
-import oracle.sql.ARRAY;\n\
-import oracle.sql.ArrayDescriptor;\n\
-import oracle.jdbc.driver.OracleDriver;\n\
-\n\
-public class j_ocp_DirList\n\
-{\n\
-	public static ARRAY getList(String directory)\n\
-		throws SQLException\n\
-	{\n\
-		Connection conn = new OracleDriver().defaultConnection();\n\
-		ArrayDescriptor arrayDescriptor = new ArrayDescriptor(\"T_OCP_FILE_LIST\", conn);\n\
-		File path = new File(directory);\n\
-		File[] files = path.listFiles();\n\
-		Object[][] result = new Object[files.length][3];\n\
-		for (int i = 0; i < files.length; i++)\n\
-		{\n\
-			result[i][0] = files[i].getName();\n\
-			result[i][1] = new Long(files[i].length());\n\
-			result[i][2] = new Timestamp(files[i].lastModified());\n\
-		}\n\
-		return new ARRAY(arrayDescriptor, conn, result);\n\
-	}\n\
-}" },
-		{ "\
-CREATE OR REPLACE\n\
-	FUNCTION f_ocp_dir_list(p_directory IN VARCHAR2)\n\
+	FUNCTION f_ocp_dir_list(p_directory IN VARCHAR2, p_pattern IN VARCHAR2, p_hashalgorithm IN VARCHAR2)\n\
 RETURN t_ocp_file_list\n\
 AS LANGUAGE JAVA\n\
-NAME 'j_ocp_DirList.getList( java.lang.String ) return oracle.sql.ARRAY';" },
+NAME 'j_ocp_DirList.getList( java.lang.String, java.lang.String, java.lang.String ) return oracle.sql.ARRAY';" },
 		{ 0 }
 	};
 

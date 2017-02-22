@@ -26,7 +26,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <libgen.h>
+#ifndef _WIN32
+# include <libgen.h>
+#else
+# include <shlwapi.h>
+#endif
 #include <popt.h>
 #include "oracle.h"
 #include "ocp.h"
@@ -40,13 +44,15 @@ enum TRANSFER_MODE { TRANSFER_MODE_INTERACTIVE, TRANSFER_MODE_OVERWRITE, TRANSFE
 struct PROGRAM_OPTIONS
 {
 	enum PROGRAM_ACTION programAction;
-	const char* lsDirectoryName;
+	char* lsDirectoryName;
 	int compressionLevel;
 	int isBackground;
 	int isKeepPartial;
 	int isKeepOriginal;
 	enum TRANSFER_MODE transferMode;
 	const char* connectionString;
+	ub4 adminMode;
+	enum HASH_ALGORITHM hashAlgorithm;
 
 	int isStdUsed;
 	int numberOfOracleSessions;
@@ -54,7 +60,11 @@ struct PROGRAM_OPTIONS
 
 void ExitWithUsage(poptContext* poptcon)
 {
+#ifndef _WIN32
 	poptPrintUsage(*poptcon, stderr, 0);
+#else
+	fprintf(stderr, "Try to run with --help or --usage option\n");
+#endif
 	exit(1);
 	/* 1 - Error in command line arguments */
 }
@@ -120,20 +130,18 @@ int main(int argc, const char *argv[])
 	char vRemoteFile[MAX_FMT_SIZE];
 	const char* fileNamePtr;
 	const char *localArg, *remoteArg;
-	char* sqlLsPtr;
-	char sqlLs[10000] = "\
-SELECT t.file_name,\
-       t.bytes,\
-       t.last_modified\
-  FROM all_directories d,\
-       TABLE(f_ocp_dir_list(d.directory_path)) t\
- WHERE d.directory_name = :directory";
+	char* filePatternPtr;
+	char filePatterns[1000];
 	struct stat fileStat;
 	struct ORACLEALLINONE oraAllInOne = { 0, 0, 0, 0 };
 	struct PROGRAM_OPTIONS programOptions;
 	struct ORACLEFILEATTR oracleFileAttr;
 	poptContext poptcon;
 	int rc;
+#ifdef _WIN32
+	DWORD mode;
+	char passBuffer[50];
+#endif
 
 	struct poptOption transferModeOptions[] =
 	{
@@ -162,6 +170,13 @@ SELECT t.file_name,\
 		POPT_TABLEEND
 	};
 
+	struct poptOption lsOptions[] =
+	{
+		{ "md5", '\0', POPT_ARG_VAL, &programOptions.hashAlgorithm, HASH_MD5, "Calculate MD5 on listed files" },
+		{ "sha1", '\0', POPT_ARG_VAL, &programOptions.hashAlgorithm, HASH_SHA1, "Calculate SHA1 on listed files" },
+		POPT_TABLEEND
+	};
+
 	struct poptOption objOptions[] =
 	{
 		{ "install", '\0', POPT_ARG_NONE, 0, ACTION_INSTALL, "Install objects" },
@@ -174,8 +189,11 @@ SELECT t.file_name,\
 		{ "list-directories", '\0', POPT_ARG_NONE, 0, ACTION_LSDIR, "List Oracle directories" },
 		{ "ls", '\0', POPT_ARG_STRING, &programOptions.lsDirectoryName, ACTION_LS, "List files in Oracle directory", "DIRECTORY" },
 		{ "rm", '\0', POPT_ARG_NONE, 0, ACTION_RM, "Remove file from Oracle directory" },
+		{ "sysdba", '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSDBA, "Connect as SYSDBA" },
+		{ "sysoper", '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSOPER, "Connect as SYSOPER" },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, transferModeOptions, 0, "Transfer options:" },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, compressionOptions, 0, "Compression options:" },
+		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, lsOptions, 0, "File list options:" },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, objOptions, 0, "Database objects for --ls support:" },
 		POPT_AUTOHELP
 		POPT_TABLEEND
@@ -191,6 +209,8 @@ SELECT t.file_name,\
 	programOptions.connectionString = 0;
 	programOptions.isStdUsed = 0;
 	programOptions.numberOfOracleSessions = 1;
+	programOptions.adminMode = OCI_DEFAULT;
+	programOptions.hashAlgorithm = 0;
 
 	poptcon = poptGetContext(NULL, argc, argv, options, 0);
 	while ((rc = poptGetNextOpt(poptcon)) >= 0)
@@ -248,6 +268,12 @@ SELECT t.file_name,\
 	if (programOptions.isKeepOriginal && programOptions.programAction != ACTION_GZIP && programOptions.programAction != ACTION_GUNZIP)
 	{
 		fprintf(stderr, "--keep can only be specified for gzip/gunzip mode\n");
+		ExitWithUsage(&poptcon);
+	}
+
+	if (programOptions.hashAlgorithm && programOptions.programAction != ACTION_LS)
+	{
+		fprintf(stderr, "Hashing option can only be specified for list mode\n");
 		ExitWithUsage(&poptcon);
 	}
 
@@ -353,7 +379,11 @@ SELECT t.file_name,\
 		    && !programOptions.isStdUsed
 		    && (strlen(vRemoteFile) == 0))
 		{
+#ifndef _WIN32
 			strcpy(vRemoteFile, basename(vLocalFile));
+#else
+			strcpy(vRemoteFile, PathFindFileName(vLocalFile));
+#endif
 		}
 
 		if (programOptions.compressionLevel > 0)
@@ -367,31 +397,17 @@ SELECT t.file_name,\
 			ExitWithUsage(&poptcon);
 		}
 
-		if (poptPeekArg(poptcon))
+		filePatterns[0] = '\0';
+		filePatternPtr = filePatterns;
+		while (poptPeekArg(poptcon))
 		{
-			strcat(sqlLs, " AND (");
-			while (poptPeekArg(poptcon))
+			if (filePatternPtr - filePatterns + strlen(poptPeekArg(poptcon)) + 1 >= sizeof(filePatterns))
 			{
-				if (strlen(sqlLs) + 25/*approx*/ + strlen(poptPeekArg(poptcon)) >= 1000)
-				{
-					fprintf(stderr, "File list is too long\n");
-					ExitWithUsage(&poptcon);
-				}
-				strcat(sqlLs, "t.file_name like '");
-				sqlLsPtr = sqlLs + strlen(sqlLs);
-				strcpy(sqlLsPtr, poptGetArg(poptcon));
-				while (*sqlLsPtr)
-				{
-					if (*sqlLsPtr == '*')
-						*sqlLsPtr = '%';
-					else if (*sqlLsPtr == '?')
-						*sqlLsPtr = '_';
-					sqlLsPtr++;
-				}
-				strcat(sqlLs, "' OR ");				
+				fprintf(stderr, "File list is too long\n");
+				ExitWithUsage(&poptcon);
 			}
-			sqlLs[strlen(sqlLs)-4] = ')';
-			sqlLs[strlen(sqlLs)-3] = '\0';
+			strcpy(filePatternPtr, poptGetArg(poptcon));
+			filePatternPtr += strlen(filePatternPtr) + 1;
 		}
 		break;
 	case ACTION_RM:
@@ -429,17 +445,39 @@ SELECT t.file_name,\
 
 	poptFreeContext(poptcon);
 
+#ifndef _WIN32
 	if (!pwdptr)
 		pwdptr = getpass("Password: ");
+#else
+	mode = 0;
+	if (!pwdptr)
+	{
+		HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
+		GetConsoleMode(hStdin, &mode);
+		SetConsoleMode(hStdin, mode & (~ENABLE_ECHO_INPUT));
+		fprintf(stderr, "Password: ");
+		fgets(passBuffer, 50, stdin);
+		SetConsoleMode(hStdin, mode);
+		fprintf(stderr, "\n");
+		if (strlen(passBuffer) > 0 && passBuffer[strlen(passBuffer) - 1] == '\n')
+			passBuffer[strlen(passBuffer) - 1] = '\0';
+		pwdptr = passBuffer;
+	}
+#endif
 	if (!pwdptr)
 		ExitWithError(&oraAllInOne, 1, ERROR_OS, 0);
 
-	OracleLogon(&oraAllInOne, connectionString, pwdptr, dbconptr, PACKAGE, programOptions.numberOfOracleSessions);
+	OracleLogon(&oraAllInOne, connectionString, pwdptr, dbconptr, programOptions.adminMode, PACKAGE, programOptions.numberOfOracleSessions);
 
 	switch (programOptions.programAction)
 	{
 	case ACTION_READ:
+		TryDirectory(&oraAllInOne, vDirectory);
+#ifndef _WIN32
 		if (!programOptions.isStdUsed && access(vLocalFile, F_OK) != -1)
+#else
+		if (!programOptions.isStdUsed && PathFileExists(vLocalFile))
+#endif
 			ConfirmOverwrite(&oraAllInOne, &programOptions, vLocalFile);
 		if (programOptions.compressionLevel > 0)
 			DownloadFileWithCompression(&oraAllInOne, vDirectory, programOptions.compressionLevel, vRemoteFile, vLocalFile, programOptions.isKeepPartial, programOptions.transferMode == TRANSFER_MODE_RESUME);
@@ -447,6 +485,7 @@ SELECT t.file_name,\
 			TransferFile(&oraAllInOne, 1, vDirectory, vRemoteFile, vLocalFile, programOptions.isKeepPartial, programOptions.transferMode == TRANSFER_MODE_RESUME);
 		break;
 	case ACTION_WRITE:
+		TryDirectory(&oraAllInOne, vDirectory);
 		GetOracleFileAttr(&oraAllInOne, vDirectory, vRemoteFile, &oracleFileAttr);
 		if (oracleFileAttr.bExists)
 			ConfirmOverwrite(&oraAllInOne, &programOptions, vRemoteFile);
@@ -459,12 +498,15 @@ SELECT t.file_name,\
 		LsDir(&oraAllInOne);
 		break;
 	case ACTION_LS:
-		Ls(&oraAllInOne, vDirectory, sqlLs);
+		TryDirectory(&oraAllInOne, vDirectory);
+		Ls(&oraAllInOne, vDirectory, filePatterns, filePatternPtr - filePatterns, programOptions.hashAlgorithm);
 		break;
 	case ACTION_RM:
+		TryDirectory(&oraAllInOne, vDirectory);
 		Rm(&oraAllInOne, vDirectory, vRemoteFile);
 		break;
 	case ACTION_GZIP:
+		TryDirectory(&oraAllInOne, vDirectory);
 		GetOracleFileAttr(&oraAllInOne, vDirectory, vLocalFile, &oracleFileAttr);
 		if (oracleFileAttr.bExists)
 			ConfirmOverwrite(&oraAllInOne, &programOptions, vLocalFile);
@@ -474,6 +516,7 @@ SELECT t.file_name,\
 			Compress(&oraAllInOne, vDirectory, programOptions.compressionLevel, programOptions.isKeepOriginal, vRemoteFile, vLocalFile);
 		break;
 	case ACTION_GUNZIP:
+		TryDirectory(&oraAllInOne, vDirectory);
 		GetOracleFileAttr(&oraAllInOne, vDirectory, vLocalFile, &oracleFileAttr);
 		if (oracleFileAttr.bExists)
 			ConfirmOverwrite(&oraAllInOne, &programOptions, vLocalFile);

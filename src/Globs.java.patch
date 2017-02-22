@@ -1,0 +1,14 @@
+--- Globs.java.orig	2016-01-01 18:46:45.437340183 -0500
++++ Globs.java	2016-01-01 18:47:44.353340390 -0500
+@@ -23,9 +23,9 @@
+  * questions.
+  */
+ 
+-package com.madgag.globs.openjdk;
++//package com.madgag.globs.openjdk;
+ 
+-import java.util.regex.PatternSyntaxException;
++//import java.util.regex.PatternSyntaxException;
+ 
+ public class Globs {
+     private Globs() { }

@@ -1,0 +1,7 @@
+--- strlcat.c.orig	2015-10-15 17:12:33.484108916 -0400
++++ strlcat.c	2015-10-15 17:12:36.681102231 -0400
+@@ -53,4 +53,3 @@
+ 
+ 	return(dlen + (src - osrc));	/* count does not include NUL */
+ }
+-DEF_WEAK(strlcat);

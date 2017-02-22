@@ -26,13 +26,16 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <libgen.h>
+#ifndef _WIN32
+# include <libgen.h>
+#endif
 
 #include <oci.h>
 #include "oracle.h"
 #include "ocp.h"
-#include "progressmeter.h"
-
+#ifndef _WIN32
+# include "progressmeter.h"
+#endif
 
 void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
                   char* pDirectory, char* pRemoteFile, char* pLocalFile,
@@ -46,7 +49,10 @@ void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
 	ub8 vSkipBytes;
 	ub4 vFHandle1;
 	ub4 vFHandle2;
+	char vServerType[10];
+#ifndef _WIN32
 	int showProgress;
+#endif
 	int isStdUsed;
 	off_t cnt;
 	off_t sourceSize;
@@ -75,25 +81,25 @@ void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
 	};
 
 	struct ORACLESTATEMENT oraStmtOpen = { "\
-declare \
-  handle utl_file.file_type; \
-begin \
-  handle := utl_file.fopen(:directory, :filename, :openmode); \
-  if :skipbytes > 0 then \
-    declare \
-      buffer_ raw(16384); \
-      leftToSkip_ number := :skipbytes; \
-      size_ number; \
-    begin \
-      while leftToSkip_ > 0 loop \
-        size_ := least(leftToSkip_, 16384); \
-        utl_file.get_raw(handle, buffer_, size_); \
-        leftToSkip_ := leftToSkip_ - size_; \
-      end loop; \
-    end; \
-  end if; \
-  :fhandle1 := handle.id; \
-  :fhandle2 := handle.datatype; \
+declare\n\
+  handle utl_file.file_type;\n\
+begin\n\
+  handle := utl_file.fopen(:directory, :filename, :openmode);\n\
+  if :skipbytes > 0 then\n\
+    declare\n\
+      buffer_ raw(16384);\n\
+      leftToSkip_ number := :skipbytes;\n\
+      size_ number;\n\
+    begin\n\
+      while leftToSkip_ > 0 loop\n\
+        size_ := least(leftToSkip_, 16384);\n\
+        utl_file.get_raw(handle, buffer_, size_);\n\
+        leftToSkip_ := leftToSkip_ - size_;\n\
+      end loop;\n\
+    end;\n\
+  end if;\n\
+  :fhandle1 := handle.id;\n\
+  :fhandle2 := handle.datatype;\n\
 end;",
 	       0, bindVariablesOpen, NO_ORACLE_DEFINES };
 
@@ -105,12 +111,12 @@ end;",
 	};
 
 	struct ORACLESTATEMENT oraStmtClose = { "\
-declare \
-  handle utl_file.file_type; \
-begin \
-  handle.id := :fhandle1; \
-  handle.datatype := :fhandle2; \
-  utl_file.fclose(handle); \
+declare\n\
+  handle utl_file.file_type;\n\
+begin\n\
+  handle.id := :fhandle1;\n\
+  handle.datatype := :fhandle2;\n\
+  utl_file.fclose(handle);\n\
 end;",
 	       0, bindVariablesClose, NO_ORACLE_DEFINES };
 
@@ -124,16 +130,16 @@ end;",
 	};
 
 	struct ORACLESTATEMENT oraStmtRead = { "\
-declare \
-  handle utl_file.file_type; \
-begin \
-  handle.id := :fhandle1; \
-  handle.datatype := :fhandle2; \
-  utl_file.get_raw(handle, :buffer, :size); \
-  :size := utl_raw.length(:buffer); \
-exception \
-  when no_data_found then \
-    :size := 0; \
+declare\n\
+  handle utl_file.file_type;\n\
+begin\n\
+  handle.id := :fhandle1;\n\
+  handle.datatype := :fhandle2;\n\
+  utl_file.get_raw(handle, :buffer, :size);\n\
+  :size := utl_raw.length(:buffer);\n\
+exception\n\
+  when no_data_found then\n\
+    :size := 0;\n\
 end;",
 	       0, bindVariablesRead, NO_ORACLE_DEFINES };
 
@@ -146,14 +152,40 @@ end;",
 	};
 
 	struct ORACLESTATEMENT oraStmtWrite = { "\
-declare \
-  handle utl_file.file_type; \
-begin \
-  handle.id := :fhandle1; \
-  handle.datatype := :fhandle2; \
-  utl_file.put_raw(handle, :buffer); \
+declare\n\
+  handle utl_file.file_type;\n\
+begin\n\
+  handle.id := :fhandle1;\n\
+  handle.datatype := :fhandle2;\n\
+  utl_file.put_raw(handle, :buffer);\n\
 end;",
 	       0, bindVariablesWrite, NO_ORACLE_DEFINES };
+
+	struct ORACLEDEFINE oraDefinesGetServerType[] =
+	{
+		{ 0, SQLT_STR, vServerType, sizeof(vServerType), 0 },
+		{ 0 }
+	};
+
+	struct ORACLESTATEMENT oraStmtGetServerType = { "\
+select server\n\
+  from v$session\n\
+ where audsid = sys_context('USERENV', 'SESSIONID')",
+	       0, NO_BIND_VARIABLES, oraDefinesGetServerType };
+
+	if (readingDirection)
+	{
+		PrepareStmtAndBind(oraAllInOne, &oraStmtGetServerType);
+		if (ExecuteStmt(oraAllInOne) != OCI_SUCCESS)
+		{
+			fprintf(stderr, "WARNING: unable to detect whether DEDICATED server is used\n");
+		}
+		else if (strcmp(vServerType, "DEDICATED"))
+		{
+			ExitWithError(oraAllInOne, 4, ERROR_NONE, "Must connect through DEDICATED server, got %s\n", vServerType);
+		}
+		ReleaseStmt(oraAllInOne);
+	}
 
 	isStdUsed = !strcmp(pLocalFile, "-");
 	if (isStdUsed)
@@ -194,6 +226,7 @@ end;",
 
 	ReleaseStmt(oraAllInOne);
 
+#ifndef _WIN32
 	showProgress = 1;
 	if (!isatty(STDOUT_FILENO) || isStdUsed)
 		showProgress = 0;
@@ -213,6 +246,7 @@ end;",
 
 		start_progress_meter(readingDirection ? pRemoteFile : basename(pLocalFile), sourceSize, &cnt);
 	}
+#endif
 
 	PrepareStmtAndBind(oraAllInOne, readingDirection ? &oraStmtRead : &oraStmtWrite);
 
@@ -351,8 +385,10 @@ end;",
 		}
 	}
 
+#ifndef _WIN32
 	if (showProgress)
 		stop_progress_meter();
+#endif
 	if (!isStdUsed)
 		fclose(fp);
 	ReleaseStmt(oraAllInOne);

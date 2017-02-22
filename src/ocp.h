@@ -29,7 +29,10 @@ struct ORACLEFILEATTR
 	ub8 length;
 };
 
+enum HASH_ALGORITHM { HASH_NONE, HASH_MD5, HASH_SHA1 };
+
 void GetOracleFileAttr(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, char* pFileName, struct ORACLEFILEATTR *oraFileAttr);
+void TryDirectory(struct ORACLEALLINONE *oraAllInOne, char* pDirectory);
 
 void TransferFile(struct ORACLEALLINONE *oraAllInOne, int readingDirection,
                   char* pDirectory, char* pRemoteFile, char* pLocalFile,
@@ -52,7 +55,7 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
                                int isKeepPartial, int isResume);
 
 void LsDir(struct ORACLEALLINONE *oraAllInOne);
-void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, const char* sql);
+void Ls(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, char* patterns, int patternLength, enum HASH_ALGORITHM hashAlgorithm);
 void Rm(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, char* pFileName);
 
 void InstallObjects(struct ORACLEALLINONE* oraAllInOne);

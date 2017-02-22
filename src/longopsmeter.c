@@ -21,6 +21,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  * too), see also copyrights in that file
  */
 
+#if HAVE_CONFIG_H
+# include <config.h>
+#endif
+
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/uio.h>
@@ -96,21 +100,21 @@ static struct ORACLEDEFINE oraDefinesWatchLongops[] =
 };
 
 	static struct ORACLESTATEMENT oraStmtWatchLongops = { "\
-select opname,\
-       target_desc,\
-       sofar,\
-       totalwork,\
-       time_remaining,\
-       elapsed_seconds\
-  from gv$session_longops\
- where sid = :sid\
-       and inst_id = :instance\
-       and sofar < totalwork\
-       and serial# = (select distinct first_value(serial#) over (order by start_time desc)\
-                        from gv$session_longops\
-                       where sid = :sid\
-                             and inst_id = :instance)\
-order by\
+select opname,\n\
+       target_desc,\n\
+       sofar,\n\
+       totalwork,\n\
+       time_remaining,\n\
+       elapsed_seconds\n\
+  from gv$session_longops\n\
+ where sid = :sid\n\
+       and inst_id = :instance\n\
+       and sofar < totalwork\n\
+       and serial# = (select distinct first_value(serial#) over (order by start_time desc)\n\
+                        from gv$session_longops\n\
+                       where sid = :sid\n\
+                             and inst_id = :instance)\n\
+order by\n\
        totalwork - sofar\
 ",
 		0, oraBindsWatchLongops, oraDefinesWatchLongops };
@@ -192,10 +196,10 @@ refresh_longops_meter(void)
 	}
 
 	/* percent of transfer done */
-	if (vTotalWork != 0)
-		percent = ((float)vSoFar / vTotalWork) * 100;
-	else
+	if (vTotalWork == 0 || vSoFar == vTotalWork)
 		percent = 100;
+	else
+		percent = ((float)vSoFar / vTotalWork) * 100;
 	snprintf(buf + strlen(buf), win_size - strlen(buf),
 	    " %3d%% ", percent);
 

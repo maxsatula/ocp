@@ -213,6 +213,7 @@ void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
                  const char* userName,
                  const char* password,
                  const char* connection,
+                 ub4 adminMode,
                  const char* module,
                  int numberOfConnections)
 {
@@ -281,7 +282,7 @@ void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
 			attrType = OCI_CRED_EXT;
 
 		switch (OCISessionBegin(oraAllInOne->svchp[i], oraAllInOne->errhp,
-		                        oraAllInOne->usrhp[i], attrType, OCI_DEFAULT))
+		                        oraAllInOne->usrhp[i], attrType, adminMode))
 		{
 		case OCI_SUCCESS_WITH_INFO:
 			ExitWithError(oraAllInOne, -1, ERROR_OCI, 0);
@@ -344,14 +345,14 @@ void GetSessionId(struct ORACLEALLINONE *oraAllInOne, struct ORACLESESSIONID *or
 {
 	struct ORACLEDEFINE oraDefinesGetSid[] =
 	{
-		{ 0, SQLT_INT, &oracleSessionId->sid, sizeof(oracleSessionId->sid), 0 },
+		{ 0, SQLT_INT, &oracleSessionId->sid,      sizeof(oracleSessionId->sid),      0 },
 		{ 0, SQLT_INT, &oracleSessionId->instance, sizeof(oracleSessionId->instance), 0 },
 		{ 0 }
         };
 
 	struct ORACLESTATEMENT oraStmtGetSid = { "\
-select sys_context('USERENV', 'SID'),\
-       sys_context('USERENV', 'INSTANCE')\
+select sys_context('USERENV', 'SID'),\n\
+       sys_context('USERENV', 'INSTANCE')\n\
   from dual",
 		0, NO_BIND_VARIABLES, oraDefinesGetSid };
 

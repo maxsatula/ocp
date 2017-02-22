@@ -1,3 +1,10 @@
+ocp 0.2
+
+* added --sysdba and --sysoper options to connect to Oracle accordingly
+* added --md5 and --sha1 options to calculate file hashes
+
+----------------------------------------------------------------------------
+
 ocp 0.1 
 
 * first alpha version of the tool

@@ -1,0 +1,32 @@
+"DECLARE\n\
+	f_handle UTL_FILE.FILE_TYPE;\n\
+	c_handle BINARY_INTEGER;\n\
+	raw_buffer RAW(32767);\n\
+	pos NUMBER;\n\
+	rindex BINARY_INTEGER;\n\
+	slno BINARY_INTEGER;\n\
+	target NUMBER;\n\
+BEGIN\n\
+	rindex := dbms_application_info.set_session_longops_nohint;\n\
+	select object_id\n\
+	  into target\n\
+	  from all_objects\n\
+	 where object_type = 'DIRECTORY'\n\
+	       and object_name = :directory;\n\
+	c_handle := UTL_COMPRESS.LZ_UNCOMPRESS_OPEN(:blob);\n\
+	f_handle := UTL_FILE.FOPEN(:directory, :filename, :openmode);\n\
+	pos := :skipped;\n\
+	LOOP\n\
+		BEGIN\n\
+			UTL_COMPRESS.LZ_UNCOMPRESS_EXTRACT(c_handle, raw_buffer);\n\
+			UTL_FILE.PUT_RAW(f_handle, raw_buffer);\n\
+			pos := pos + utl_raw.length(raw_buffer);\n\
+			dbms_application_info.set_session_longops(rindex, slno, 'GUNZIP', target, 0, pos, :file_size, :directory || ':' || :filename, 'bytes');\n\
+		EXCEPTION\n\
+			WHEN NO_DATA_FOUND THEN\n\
+				EXIT;\n\
+		END;\n\
+	END LOOP;\n\
+	UTL_FILE.FCLOSE(f_handle);\n\
+	UTL_COMPRESS.LZ_UNCOMPRESS_CLOSE(c_handle);\n\
+END;"
