@@ -1,3 +1,9 @@
+2017-07-12  Max Satula <maksym.satula@gmail.com>
+
+* Fix crash in --ls when Oracle directory object points
+  to a nonexistent directory
+* Do not print column names if no files found in --ls
+
 2016-04-18  Max Satula <maksym.satula@gmail.com>
 
 * Fix compiler warnings

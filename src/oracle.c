@@ -24,6 +24,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <string.h>
 #include "oracle.h"
 
+#define ORA_JAVA_EXCEPTION 29532
+
 struct BINDVARIABLE NO_BIND_VARIABLES[] = { { 0 } };
 struct ORACLEDEFINE NO_ORACLE_DEFINES[] = { { 0 } };
 
@@ -134,6 +136,9 @@ void ExitWithError(struct ORACLEALLINONE *oraAllInOne, int exitCode, enum ERROR_
 	int i;
 	sb4 errorCode;
 	char errorMsg[MAX_FMT_SIZE];
+	char* msgPtr;
+
+	static const char* javaFileNotFoundException = "java.io.FileNotFoundException: ";
 
 	fflush(stdout);
 	if (message)
@@ -153,7 +158,16 @@ void ExitWithError(struct ORACLEALLINONE *oraAllInOne, int exitCode, enum ERROR_
 		if (oraAllInOne->errhp)
 		{
 			OCIErrorGet(oraAllInOne->errhp, 1, 0, &errorCode, errorMsg, sizeof(errorMsg), OCI_HTYPE_ERROR);
-			fprintf(stderr, "%s", errorMsg);
+			if (exitCode == 5 && errorCode == ORA_JAVA_EXCEPTION &&
+			    (msgPtr = strstr(errorMsg, javaFileNotFoundException)))
+			{
+				fprintf(stderr, "Directory does not exist on the database server: %s",
+				                msgPtr + strlen(javaFileNotFoundException));
+			}
+			else
+			{
+				fprintf(stderr, "%s", errorMsg);
+			}
 		}
 		break;
 	case ERROR_OS:

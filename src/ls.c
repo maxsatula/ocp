@@ -85,24 +85,6 @@ SELECT t.file_name,\n\
 	SetSessionAction(oraAllInOne, "LS");
 	PrepareStmtAndBind(oraAllInOne, &oraStmtLs);
 
-	if (hashAlgorithm != HASH_NONE)
-	{
-		printf("Contents of %s directory\n\
-%-40s %s hash\n\
----------------------------------------- ",
-		       pDirectory, "File Name", vHashAlgorithm);
-		for (j = 0; j < hashLength*2; j++)
-			printf("-");
-		printf("\n");
-	}
-	else
-	{
-		printf("Contents of %s directory\n\
-%-40s %-12s %s\n\
----------------------------------------- ------------ -------------------\n",
-		       pDirectory, "File Name", "    Size", "Last Modified");
-	}
-
 	i = 0;
 	totalBytes = 0;
 	foundKnownSize = foundUnknownSize = 0;
@@ -111,6 +93,17 @@ SELECT t.file_name,\n\
 	{
 		if (hashAlgorithm != HASH_NONE)
 		{
+			if (!i)
+			{
+				printf("Contents of %s directory\n\
+%-40s %s hash\n\
+---------------------------------------- ",
+				       pDirectory, "File Name", vHashAlgorithm);
+				for (j = 0; j < hashLength*2; j++)
+					printf("-");
+				printf("\n");
+			}
+
 			printf("%-40s ",
 			       vFileName);
 			if (oraStmtLs.oraDefines[3].indp != -1)
@@ -122,25 +115,37 @@ SELECT t.file_name,\n\
 			}
 			printf("\n");
 		}
-		else if (oraStmtLs.oraDefines[1].indp != -1 &&
-		    oraStmtLs.oraDefines[2].indp != -1)
-		{
-			printf("%-40s %12lld %02d/%02d/%d %02d:%02d:%02d\n",
-			       vFileName,
-			       (long long)vBytes,
-			       (int)vLastModified[2],
-			       (int)vLastModified[3],
-			       ((int)vLastModified[0]-100) * 100 + ((int)vLastModified[1] - 100),
-			       (int)vLastModified[4] - 1,
-			       (int)vLastModified[5] - 1,
-			       (int)vLastModified[6] - 1);
-			totalBytes += vBytes;
-			foundKnownSize = 1;
-		}
 		else
 		{
-			printf("%-40s  (no access) (no access)\n", vFileName);
-			foundUnknownSize = 1;
+			if (!i)
+			{
+				printf("Contents of %s directory\n\
+%-40s %-12s %s\n\
+---------------------------------------- ------------ -------------------\n",
+				       pDirectory, "File Name", "    Size", "Last Modified");
+			}
+
+			if (oraStmtLs.oraDefines[1].indp != -1 &&
+			    oraStmtLs.oraDefines[2].indp != -1)
+			{
+
+				printf("%-40s %12lld %02d/%02d/%d %02d:%02d:%02d\n",
+				       vFileName,
+				       (long long)vBytes,
+				       (int)vLastModified[2],
+				       (int)vLastModified[3],
+				       ((int)vLastModified[0]-100) * 100 + ((int)vLastModified[1] - 100),
+				       (int)vLastModified[4] - 1,
+				       (int)vLastModified[5] - 1,
+				       (int)vLastModified[6] - 1);
+				totalBytes += vBytes;
+				foundKnownSize = 1;
+			}
+			else
+			{
+				printf("%-40s  (no access) (no access)\n", vFileName);
+				foundUnknownSize = 1;
+			}
 		}
 		i++;
 
@@ -149,18 +154,21 @@ SELECT t.file_name,\n\
 	}
 
 	if (ociResult != OCI_NO_DATA)
-		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to list files in oracle directory\n");
+		ExitWithError(oraAllInOne, 5, ERROR_OCI, "Failed to list files in oracle directory\n");
 
-	if (hashAlgorithm == HASH_NONE)
+	if (i)
 	{
-		if (i)
-			printf("---------------------------------------- ------------ -------------------\n");
-		printf("%5d File(s)", i);
-		if (!foundKnownSize && foundUnknownSize)
-			printf("\n");
-		else
-			printf(" %39lld%s\n", totalBytes, foundUnknownSize ? "+" : "");
+		if (hashAlgorithm == HASH_NONE)
+		{
+			printf("---------------------------------------- ------------ -------------------\n%5d File(s)", i);
+			if (!foundKnownSize && foundUnknownSize)
+				printf("\n");
+			else
+				printf(" %39lld%s\n", totalBytes, foundUnknownSize ? "+" : "");
+		}
 	}
+	else
+		printf("No files found\n");
 
 	ReleaseStmt(oraAllInOne);	
 	SetSessionAction(oraAllInOne, 0);
