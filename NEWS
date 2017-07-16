@@ -1,3 +1,9 @@
+ocp <future-version>
+
+* added man page
+
+----------------------------------------------------------------------------
+
 ocp 0.2
 
 * added --sysdba and --sysoper options to connect to Oracle accordingly
