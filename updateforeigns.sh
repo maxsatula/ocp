@@ -81,13 +81,13 @@ cat << EOF
 
 EOF
 
-grep -Ezo '(\w+)(\s*)monotime_double([^)]*)\)' progressmeter/misc.c.orig
+grep -Ezo '(\w+)(\s*)monotime_double([^)]*)\)' progressmeter/misc.c.orig | sed 's/\x00/\n/'
 
 cat << EOF
 ; /* taken from the original OpenSSH misc.h/misc.c */
 EOF
 
-grep -Ezo '(\w+)(\s*)strlcat([^)]*)\)' progressmeter/strlcat.c.orig
+grep -Ezo '(\w+)(\s*)strlcat([^)]*)\)' progressmeter/strlcat.c.orig | sed 's/\x00/\n/'
 
 cat << EOF
 ; /* declaration for strlcat.c */
@@ -115,7 +115,8 @@ EOF
 grep -Ezo '(\w+)(\s*)monotime_double([^}]*)}' ${filename} | sed \
 	-e 's/if (/\/*if (*\//' \
 	-e 's/ != 0)/\/* != 0)/' \
-	-e 's/strerror(errno))/strerror(errno))*\//'
+	-e 's/strerror(errno))/strerror(errno))*\//' \
+	-e 's/\x00/\n/'
 ) > progressmeter/misc.c
 
 # 3. Remove intermediate files
