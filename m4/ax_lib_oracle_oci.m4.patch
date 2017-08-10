@@ -1,6 +1,6 @@
---- ax_lib_oracle_oci.m4.orig	2017-08-08 21:44:16.139382982 -0400
-+++ ax_lib_oracle_oci.m4	2017-08-08 21:41:15.715382347 -0400
-@@ -156,15 +156,18 @@
+--- ax_lib_oracle_oci.m4.orig	2017-08-10 13:26:40.626532915 -0400
++++ ax_lib_oracle_oci.m4	2017-08-10 13:57:35.778539449 -0400
+@@ -156,25 +156,28 @@
          dnl Depending on later Oracle version detection,
          dnl -lnnz10 flag might be removed for older Oracle < 10.x
          saved_LDFLAGS="$LDFLAGS"
@@ -21,6 +21,19 @@
          AC_COMPILE_IFELSE([
              AC_LANG_PROGRAM([[@%:@include <oci.h>]],
                  [[
+ #if defined(OCI_MAJOR_VERSION)
+ #if OCI_MAJOR_VERSION == 10 && OCI_MINOR_VERSION == 2
+-// Oracle 10.2 detected
++/* Oracle 10.2 detected */
+ #endif
+ #elif defined(OCI_V7_SYNTAX)
+-// OK, older Oracle detected
+-// TODO - mloskot: find better macro to check for older versions;
++/* OK, older Oracle detected */
++/* TODO - mloskot: find better macro to check for older versions; */
+ #else
+ #  error Oracle oci.h header not found
+ #endif
 @@ -195,7 +198,7 @@
              AC_MSG_RESULT([not found])
              ]

@@ -173,11 +173,11 @@ Please, locate Oracle directories using --with-oci or \
                 [[
 #if defined(OCI_MAJOR_VERSION)
 #if OCI_MAJOR_VERSION == 10 && OCI_MINOR_VERSION == 2
-// Oracle 10.2 detected
+/* Oracle 10.2 detected */
 #endif
 #elif defined(OCI_V7_SYNTAX)
-// OK, older Oracle detected
-// TODO - mloskot: find better macro to check for older versions;
+/* OK, older Oracle detected */
+/* TODO - mloskot: find better macro to check for older versions; */
 #else
 #  error Oracle oci.h header not found
 #endif
