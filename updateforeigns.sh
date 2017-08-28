@@ -40,7 +40,7 @@ done
 download "http://cvsweb.openbsd.org/cgi-bin/cvsweb/~checkout~/src/lib/libc/string/strlcat.c" \
          progressmeter/strlcat.c.orig
 download "http://git.savannah.gnu.org/gitweb/?p=autoconf-archive.git;a=blob_plain;f=m4/ax_lib_oracle_oci.m4" \
-         m4/ax_lib_oracle_oci.m4.orig
+         m4/ax_lib_oracle_oci.m4
 download "http://git.savannah.gnu.org/gitweb/?p=gnulib.git;a=blob_plain;f=lib/yesno.h;hb=HEAD" \
          yesno/yesno.h
 download "http://git.savannah.gnu.org/gitweb/?p=gnulib.git;a=blob_plain;f=lib/yesno.c;hb=HEAD" \
@@ -59,7 +59,7 @@ done
 # 2.2. Medium case, sources need a slight patch
 
 for file in progressmeter/progressmeter.c progressmeter/atomicio.c progressmeter/strlcat.c \
-        m4/ax_lib_oracle_oci.m4 src/Globs.java; do
+        src/Globs.java; do
 	patch --backup-if-mismatch -u -o ${file} ${file}.orig ${file}.patch
 done
 
@@ -127,6 +127,5 @@ rm progressmeter/progressmeter.h.orig \
    progressmeter/atomicio.c.orig \
    progressmeter/misc.c.orig \
    progressmeter/strlcat.c.orig \
-   m4/ax_lib_oracle_oci.m4.orig \
    src/Globs.java.orig
 
