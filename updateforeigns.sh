@@ -112,10 +112,14 @@ cat << EOF
 #include <time.h>
 
 EOF
-grep -Ezo '(\w+)(\s*)monotime_double([^}]*)}' ${filename} | sed \
+
+grep -Ezo '(\w+)(\s*)monotime_ts([^}]*)}' ${filename} | sed \
 	-e 's/if (/\/*if (*\//' \
 	-e 's/ != 0)/\/* != 0)/' \
 	-e 's/strerror(errno))/strerror(errno))*\//' \
+	-e 's/\x00/\n\n/'
+
+grep -Ezo '(\w+)(\s*)monotime_double([^}]*)}' ${filename} | sed \
 	-e 's/\x00/\n/'
 ) > progressmeter/misc.c
 

@@ -1,4 +1,4 @@
-/* $OpenBSD: misc.c,v 1.113 2017/08/18 05:48:04 djm Exp $ */
+/* $OpenBSD: misc.c,v 1.127 2018/03/12 00:52:01 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2005,2006 Damien Miller.  All rights reserved.
@@ -32,13 +32,18 @@
 #include <errno.h>
 #include <time.h>
 
+void
+monotime_ts(struct timespec *ts)
+{
+	/*if (*/clock_gettime(CLOCK_MONOTONIC, ts)/* != 0)
+		fatal("clock_gettime: %s", strerror(errno))*/;
+}
+
 double
 monotime_double(void)
 {
 	struct timespec ts;
 
-	/*if (*/clock_gettime(CLOCK_MONOTONIC, &ts)/* != 0)
-		fatal("clock_gettime: %s", strerror(errno))*/;
-
-	return (ts.tv_sec + (double)ts.tv_nsec / 1000000000);
+	monotime_ts(&ts);
+	return (double)ts.tv_sec + (double)ts.tv_nsec / 1000000000.0;
 }
