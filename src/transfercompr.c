@@ -85,7 +85,7 @@ void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDire
 	SetSessionAction(oraAllInOne, "GZIP_AND_DOWNLOAD: GZIP");
 	if (OCIDescriptorAlloc(oraAllInOne->envhp, (void**)&oraAllInOne->blob, OCI_DTYPE_LOB, 0, 0))
 	{
-		ExitWithError(oraAllInOne, 4, ERROR_NONE, "Failed to allocate BLOB\n");
+		ExitWithError(oraAllInOne, RET_OCIINIT, ERROR_NONE, "Failed to allocate BLOB\n");
 	}
 
 	cnt = 0;
@@ -115,13 +115,13 @@ void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDire
 #endif
 
 	if (ociResult)
-		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to compress file in oracle directory\n");
+		ExitWithError(oraAllInOne, RET_ORA, ERROR_OCI, "Failed to compress file in oracle directory\n");
 
 #ifndef _WIN32
 	if (showProgress)
 	{
 		if (OCILobGetLength2(oraAllInOne->svchp[0], oraAllInOne->errhp, oraAllInOne->blob, (oraub8*)&sourceSize))
-			ExitWithError(oraAllInOne, 4, ERROR_OCI, "Error getting BLOB length\n");
+			ExitWithError(oraAllInOne, RET_ORA, ERROR_OCI, "Error getting BLOB length\n");
 		strcpy(progressLine, "TRANSFER & GUNZIP: ");
 		strncat(progressLine, basename(pLocalFile), MAX_FMT_SIZE - 1 - strlen(progressLine));
 		start_progress_meter(progressLine, sourceSize, &cnt);
@@ -131,7 +131,7 @@ void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDire
 	SetSessionAction(oraAllInOne, "GZIP_AND_DOWNLOAD: DOWNLOAD");
 	if (!isStdUsed && (fp = fopen(pLocalFile, isResume ? "ab" : "wb")) == NULL)
 	{
-		ExitWithError(oraAllInOne, 4, ERROR_OS, "Error opening a local file for writing\n");
+		ExitWithError(oraAllInOne, RET_FS, ERROR_OS, "Error opening a local file for writing\n");
 	}
 	if (isStdUsed)
 		fp = stdout;
@@ -146,7 +146,7 @@ void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDire
 	{
 		if (!isStdUsed)
 			fclose(fp);
-		ExitWithError(oraAllInOne, 5, ERROR_NONE, "ZLIB initialization failed\n");
+		ExitWithError(oraAllInOne, RET_ZLIB, ERROR_NONE, "ZLIB initialization failed\n");
 	}
 
 	vSize = 0;
@@ -170,7 +170,7 @@ void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDire
 				(void)inflateEnd(&zStrm);
 				if (!isStdUsed)
 					fclose(fp);
-				ExitWithError(oraAllInOne, 5, ERROR_NONE, "ZLIB inflate failed: %d, size %d\n", zRet, vSize);
+				ExitWithError(oraAllInOne, RET_ZLIB, ERROR_NONE, "ZLIB inflate failed: %d, size %d\n", zRet, vSize);
 			}
 
 			fwrite(zOut, sizeof(unsigned char), ORA_BLOB_BUFFER_SIZE - zStrm.avail_out, fp);
@@ -179,13 +179,13 @@ void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDire
 				(void)inflateEnd(&zStrm);
 				if (!isStdUsed)
 					fclose(fp);
-				ExitWithError(oraAllInOne, -1, ERROR_OS, "Error writing to a local file\n");
+				ExitWithError(oraAllInOne, RET_DONOTEXIT, ERROR_OS, "Error writing to a local file\n");
 				if (!isKeepPartial)
 				{
 					if (unlink(pLocalFile))
-						ExitWithError(oraAllInOne, 4, ERROR_OS, "Could not remove partial file %s\n", pLocalFile);
+						ExitWithError(oraAllInOne, RET_FS, ERROR_OS, "Could not remove partial file %s\n", pLocalFile);
 				}
-				ExitWithError(oraAllInOne, 4, ERROR_NONE, 0);
+				ExitWithError(oraAllInOne, RET_FS, ERROR_NONE, 0);
 			}
 		}
 		while (zStrm.avail_out == 0);
@@ -205,7 +205,7 @@ void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDire
 
 	if (ociResult != OCI_SUCCESS)
 	{
-		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Error reading BLOB\n");
+		ExitWithError(oraAllInOne, RET_ORA, ERROR_OCI, "Error reading BLOB\n");
 	}
 
 	ReleaseStmt(oraAllInOne);
@@ -215,7 +215,7 @@ void DownloadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDire
 
 	if (OCIDescriptorFree(oraAllInOne->blob, OCI_DTYPE_LOB))
 	{
-		ExitWithError(oraAllInOne, 4, ERROR_NONE, "Failed to free BLOB\n");
+		ExitWithError(oraAllInOne, RET_OCIINIT, ERROR_NONE, "Failed to free BLOB\n");
 	}
 	oraAllInOne->blob = 0;
 }
@@ -268,17 +268,14 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
 	SetSessionAction(oraAllInOne, "UPLOAD_AND_GUNZIP: UPLOAD");
 	if (OCIDescriptorAlloc(oraAllInOne->envhp, (void**)&oraAllInOne->blob, OCI_DTYPE_LOB, 0, 0))
 	{
-		ExitWithError(oraAllInOne, 4, ERROR_NONE, "Failed to allocate BLOB\n");
+		ExitWithError(oraAllInOne, RET_OCIINIT, ERROR_NONE, "Failed to allocate BLOB\n");
 	}
 
 	if (OCILobCreateTemporary(oraAllInOne->svchp[0], oraAllInOne->errhp, oraAllInOne->blob, OCI_DEFAULT, 0, OCI_TEMP_BLOB, TRUE/*cache*/, OCI_DURATION_SESSION))
 	{
-		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to create temporary BLOB\n");
+		ExitWithError(oraAllInOne, RET_ORA, ERROR_OCI, "Failed to create temporary BLOB\n");
 	}
-	/*if (OCILobOpen(oraAllInOne->svchp[0], oraAllInOne->errhp, oraAllInOne->blob, OCI_LOB_READWRITE))
-	{
-		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to open temporary BLOB for write\n");
-	}*/
+
 	piece = OCI_FIRST_PIECE;
 
 #ifndef _WIN32
@@ -310,7 +307,7 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
 
 	if (!isStdUsed && (fp = fopen(pLocalFile, "rb")) == NULL)
 	{
-		ExitWithError(oraAllInOne, 4, ERROR_OS, "Error opening a local file for reading\n");
+		ExitWithError(oraAllInOne, RET_FS, ERROR_OS, "Error opening a local file for reading\n");
 	}
 	if (isStdUsed)
 		fp = stdin;
@@ -320,7 +317,7 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
 		if (fseek(fp, cnt, SEEK_SET))
 		{
 			fclose(fp);
-			ExitWithError(oraAllInOne, 4, ERROR_OS, "Error setting reading position in a local file\n");
+			ExitWithError(oraAllInOne, RET_FS, ERROR_OS, "Error setting reading position in a local file\n");
 		}
 	}
 
@@ -333,7 +330,7 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
 	{
 		if (!isStdUsed)
 			fclose(fp);
-		ExitWithError(oraAllInOne, 5, ERROR_NONE, "ZLIB initialization failed\n");
+		ExitWithError(oraAllInOne, RET_ZLIB, ERROR_NONE, "ZLIB initialization failed\n");
 	}
 
 	while (!feof(fp))
@@ -345,7 +342,7 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
 			(void)deflateEnd(&zStrm);
 			if (!isStdUsed)
 				fclose(fp);
-			ExitWithError(oraAllInOne, 4, ERROR_OS, "Error reading from a local file\n");
+			ExitWithError(oraAllInOne, RET_FS, ERROR_OS, "Error reading from a local file\n");
 		}
 
 		zFlush = feof(fp) ? Z_FINISH : Z_NO_FLUSH;
@@ -361,7 +358,7 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
 				(void)deflateEnd(&zStrm);
 				if (!isStdUsed)
 					fclose(fp);
-				ExitWithError(oraAllInOne, 5, ERROR_NONE, "ZLIB deflate failed: %d, size %d\n", zRet, zStrm.avail_in);
+				ExitWithError(oraAllInOne, RET_ZLIB, ERROR_NONE, "ZLIB deflate failed: %d, size %d\n", zRet, zStrm.avail_in);
 			}
 
 			if (zRet == Z_STREAM_END)
@@ -376,7 +373,7 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
 				(void)deflateEnd(&zStrm);
 				if (!isStdUsed)
 					fclose(fp);
-				ExitWithError(oraAllInOne, 4, ERROR_OCI, "Error writing to BLOB\n");
+				ExitWithError(oraAllInOne, RET_ORA, ERROR_OCI, "Error writing to BLOB\n");
 			}
 			if (piece == OCI_FIRST_PIECE)
 				piece = OCI_NEXT_PIECE;
@@ -391,16 +388,6 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
 	deflateEnd(&zStrm);
 	if (!isStdUsed)
 		fclose(fp);
-
-	/*vSize = 0;
-	if (OCILobWrite2(oraAllInOne->svchp[0], oraAllInOne->errhp, oraAllInOne->blob, &vSize, 0, 1, blobBuffer, 0, OCI_LAST_PIECE, 0, 0, 0, 0))
-	{
-		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Error writing last piece to BLOB\n");
-	}
-	if (OCILobClose(oraAllInOne->svchp[0], oraAllInOne->errhp, oraAllInOne->blob))
-	{
-		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to close temporary BLOB\n");
-	}*/
 
 	isError = 0;
         strcpy(vOpenMode, isResume ? "ab" : "wb");
@@ -419,7 +406,7 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
 #endif
 	if (ociResult)
 	{
-		ExitWithError(oraAllInOne, -1, ERROR_OCI, "Failed to decompress file in oracle directory\n");
+		ExitWithError(oraAllInOne, RET_DONOTEXIT, ERROR_OCI, "Failed to decompress file in oracle directory\n");
 		isError = 1;
 	}
 	else
@@ -431,7 +418,7 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
 	if (OCIDescriptorFree(oraAllInOne->blob, OCI_DTYPE_LOB))
 	{
 		if (!isError)
-			ExitWithError(oraAllInOne, -1, ERROR_NONE, "Failed to free BLOB\n");
+			ExitWithError(oraAllInOne, RET_DONOTEXIT, ERROR_NONE, "Failed to free BLOB\n");
 		isError = 1;
 	}
 	oraAllInOne->blob = 0;
@@ -440,6 +427,6 @@ void UploadFileWithCompression(struct ORACLEALLINONE *oraAllInOne, char* pDirect
 	{
 		if (!isKeepPartial)
 			Rm(oraAllInOne, pDirectory, pRemoteFile);
-		ExitWithError(oraAllInOne, 4, ERROR_NONE, 0);
+		ExitWithError(oraAllInOne, RET_ORA, ERROR_NONE, 0);
 	}
 }

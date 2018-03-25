@@ -154,7 +154,7 @@ SELECT t.file_name,\n\
 	}
 
 	if (ociResult != OCI_NO_DATA)
-		ExitWithError(oraAllInOne, 5, ERROR_OCI, "Failed to list files in oracle directory\n");
+		ExitWithError(oraAllInOne, RET_LS, ERROR_OCI, "Failed to list files in oracle directory\n");
 
 	if (i)
 	{

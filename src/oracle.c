@@ -62,7 +62,7 @@ void PrepareStmtAndBind2(struct ORACLEALLINONE *oraAllInOne, struct ORACLESTATEM
 	                    strlen(oracleStatement->sql),
 	                    0, 0, OCI_NTV_SYNTAX, OCI_DEFAULT))
 	{
-		ExitWithError(oraAllInOne, 2, ERROR_OCI, "Failed to prepare %s\n", oracleStatement->sql);
+		ExitWithError(oraAllInOne, RET_OCIINIT, ERROR_OCI, "Failed to prepare %s\n", oracleStatement->sql);
 	}
 
 	for (i = 0; oracleStatement->oraDefines[i].value; i++)
@@ -76,7 +76,7 @@ void PrepareStmtAndBind2(struct ORACLEALLINONE *oraAllInOne, struct ORACLESTATEM
 		                   &oracleStatement->oraDefines[i].indp,
 		                   0, 0, OCI_DEFAULT))
 		{
-			ExitWithError(oraAllInOne, 2, ERROR_OCI, "Failed to set up SQL query output field #%d\n", i + 1);
+			ExitWithError(oraAllInOne, RET_OCIINIT, ERROR_OCI, "Failed to set up SQL query output field #%d\n", i + 1);
 		}
 	}
 
@@ -92,7 +92,7 @@ void PrepareStmtAndBind2(struct ORACLEALLINONE *oraAllInOne, struct ORACLESTATEM
 		                  oracleStatement->bindVariables[i].dty,
 		                  0, 0, 0, 0, 0, OCI_DEFAULT))
 		{
-			ExitWithError(oraAllInOne, 2, ERROR_OCI, "Failed to bind %s\n", oracleStatement->bindVariables[i].name);
+			ExitWithError(oraAllInOne, RET_OCIINIT, ERROR_OCI, "Failed to bind %s\n", oracleStatement->bindVariables[i].name);
 		}
 	}
 }
@@ -158,7 +158,7 @@ void ExitWithError(struct ORACLEALLINONE *oraAllInOne, int exitCode, enum ERROR_
 		if (oraAllInOne->errhp)
 		{
 			OCIErrorGet(oraAllInOne->errhp, 1, 0, &errorCode, errorMsg, sizeof(errorMsg), OCI_HTYPE_ERROR);
-			if (exitCode == 5 && errorCode == ORA_JAVA_EXCEPTION &&
+			if (exitCode == RET_LS && errorCode == ORA_JAVA_EXCEPTION &&
 			    (msgPtr = strstr(errorMsg, javaFileNotFoundException)))
 			{
 				fprintf(stderr, "Directory does not exist on the database server: %s",
@@ -240,43 +240,42 @@ void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
 					(void (*)(void  *, void  *))0,
 					(size_t)0, (void  **)0))
 	{
-		ExitWithError(oraAllInOne, 2, ERROR_NONE, "Failed to create OCI environment\n");
-		/* 2 - Error in OCI object initialization */
+		ExitWithError(oraAllInOne, RET_OCIINIT, ERROR_NONE, "Failed to create OCI environment\n");
 	}
 
 	if (OCIHandleAlloc( (dvoid *) oraAllInOne->envhp, (dvoid **) &oraAllInOne->errhp,
 	                    (ub4) OCI_HTYPE_ERROR, 0, (dvoid **) 0))
 	{
-		ExitWithError(oraAllInOne, 2, ERROR_NONE, "Failed to initialize OCIError\n");
+		ExitWithError(oraAllInOne, RET_OCIINIT, ERROR_NONE, "Failed to initialize OCIError\n");
 	}
 
 	for (i = 0; i < numberOfConnections; i++)
 	{
 		if (OCIHandleAlloc(oraAllInOne->envhp, (void*) &oraAllInOne->srvhp[i], OCI_HTYPE_SERVER, 0, 0))
 		{
-			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to attach to a server\n");
+			ExitWithError(oraAllInOne, RET_LOGIN, ERROR_OCI, "Failed to attach to a server\n");
 		}
 
 		if (OCIServerAttach(oraAllInOne->srvhp[i], oraAllInOne->errhp,
 		                    (text*)connection, (ub4)strlen(connection), OCI_DEFAULT))
 		{
-			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to attach to server\n");
+			ExitWithError(oraAllInOne, RET_LOGIN, ERROR_OCI, "Failed to attach to server\n");
 		}
 
 		if (OCIHandleAlloc(oraAllInOne->envhp, (void*) &oraAllInOne->svchp[i], OCI_HTYPE_SVCCTX, 0, 0))
 		{
-			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to login to a database\n");
+			ExitWithError(oraAllInOne, RET_LOGIN, ERROR_OCI, "Failed to login to a database\n");
 		}
 
 		if (OCIAttrSet(oraAllInOne->svchp[i], OCI_HTYPE_SVCCTX,
 		               oraAllInOne->srvhp[i], 0, OCI_ATTR_SERVER, oraAllInOne->errhp))
 		{
-			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to login to a database\n");
+			ExitWithError(oraAllInOne, RET_LOGIN, ERROR_OCI, "Failed to login to a database\n");
 		}
 
 		if (OCIHandleAlloc(oraAllInOne->envhp, (void*) &oraAllInOne->usrhp[i], OCI_HTYPE_SESSION, 0, 0))
 		{
-			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to login to a database\n");
+			ExitWithError(oraAllInOne, RET_LOGIN, ERROR_OCI, "Failed to login to a database\n");
 		}
 
 		if (*userName)
@@ -288,7 +287,7 @@ void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
 			               (text*)password, (ub4)strlen(password),
 			               OCI_ATTR_PASSWORD, oraAllInOne->errhp))
 			{
-				ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to login to a database\n");
+				ExitWithError(oraAllInOne, RET_LOGIN, ERROR_OCI, "Failed to login to a database\n");
 			}
 			attrType = OCI_CRED_RDBMS;
 		}
@@ -299,24 +298,23 @@ void OracleLogon(struct ORACLEALLINONE *oraAllInOne,
 		                        oraAllInOne->usrhp[i], attrType, adminMode))
 		{
 		case OCI_SUCCESS_WITH_INFO:
-			ExitWithError(oraAllInOne, -1, ERROR_OCI, 0);
+			ExitWithError(oraAllInOne, RET_DONOTEXIT, ERROR_OCI, 0);
 		case OCI_SUCCESS:
 			break;
 		default:
-			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to login to a database\n");
-			/* 3 - Failed to login to a database */
+			ExitWithError(oraAllInOne, RET_LOGIN, ERROR_OCI, "Failed to login to a database\n");
 		}
 
 		if (OCIAttrSet(oraAllInOne->svchp[i], OCI_HTYPE_SVCCTX,
 		               oraAllInOne->usrhp[i], 0, OCI_ATTR_SESSION, oraAllInOne->errhp))
 		{
-			ExitWithError(oraAllInOne, 3, ERROR_OCI, "Failed to login to a database\n");
+			ExitWithError(oraAllInOne, RET_LOGIN, ERROR_OCI, "Failed to login to a database\n");
 		}
 
 		if (OCIAttrSet(oraAllInOne->usrhp[i], OCI_HTYPE_SESSION,
 		               (void*)module, strlen(module), OCI_ATTR_MODULE, oraAllInOne->errhp))
 		{
-			ExitWithError(oraAllInOne, -1, ERROR_OCI, "Could not set MODULE in V$SESSION\n");
+			ExitWithError(oraAllInOne, RET_DONOTEXIT, ERROR_OCI, "Could not set MODULE in V$SESSION\n");
 		}
 	}
 }
@@ -326,7 +324,7 @@ void SetSessionAction2(struct ORACLEALLINONE *oraAllInOne, const char* action, i
 	if (OCIAttrSet(oraAllInOne->usrhp[index], OCI_HTYPE_SESSION,
 	               (void*)action, action ? strlen(action) : 0, OCI_ATTR_ACTION, oraAllInOne->errhp))
 	{
-		ExitWithError(oraAllInOne, -1, ERROR_OCI, "Could not set ACTION in V$SESSION\n");
+		ExitWithError(oraAllInOne, RET_DONOTEXIT, ERROR_OCI, "Could not set ACTION in V$SESSION\n");
 	}
 }
 
@@ -348,7 +346,7 @@ void ExecuteSimpleSqls(struct ORACLEALLINONE *oraAllInOne, struct ORACLESIMPLESQ
 			if (!oracleSimpleSqls->errCodeToIgnore ||
 			    (OCIErrorGet(oraAllInOne->errhp, 1, 0, &errorCode, errorMsg, sizeof(errorMsg), OCI_HTYPE_ERROR),
 			     errorCode != oracleSimpleSqls->errCodeToIgnore))
-				ExitWithError(oraAllInOne, 4, ERROR_OCI, 0);
+				ExitWithError(oraAllInOne, RET_ORA, ERROR_OCI, 0);
 		}
 		ReleaseStmt(oraAllInOne);
 		oracleSimpleSqls++;
@@ -372,6 +370,6 @@ select sys_context('USERENV', 'SID'),\n\
 
 	PrepareStmtAndBind2(oraAllInOne, &oraStmtGetSid, index);
 	if (ExecuteStmt2(oraAllInOne, index))
-		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Cannot get SID of the current session\n");
+		ExitWithError(oraAllInOne, RET_ORA, ERROR_OCI, "Cannot get SID of the current session\n");
 	ReleaseStmt2(oraAllInOne, index);
 }

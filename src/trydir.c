@@ -53,7 +53,7 @@ SELECT MIN(DECODE(directory_name, :directory, 1, 2))\n\
         PrepareStmtAndBind(oraAllInOne, &oraStmtTryDirectory);
 
         if (ExecuteStmt(oraAllInOne))
-                ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to get an Oracle Directory\n");
+                ExitWithError(oraAllInOne, RET_ORA, ERROR_OCI, "Failed to get an Oracle Directory\n");
 
         ReleaseStmt(oraAllInOne);
 
@@ -62,11 +62,11 @@ SELECT MIN(DECODE(directory_name, :directory, 1, 2))\n\
 	case 1:
 		break;
 	case 2:
-		ExitWithError(oraAllInOne, -1, ERROR_NONE, "WARNING: directory \"%s\" not found, converting to uppercase\n", pDirectory);
+		ExitWithError(oraAllInOne, RET_DONOTEXIT, ERROR_NONE, "WARNING: directory \"%s\" not found, converting to uppercase\n", pDirectory);
 		for (ptr = pDirectory; *ptr; ptr++)
 			*ptr = toupper(*ptr);
 		break;
 	default:
-		ExitWithError(oraAllInOne, 4, ERROR_NONE, "Directory \"%s\" does not exist\n", pDirectory);
+		ExitWithError(oraAllInOne, RET_ORA, ERROR_NONE, "Directory \"%s\" does not exist\n", pDirectory);
 	}
 }

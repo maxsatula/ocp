@@ -65,8 +65,7 @@ void ExitWithUsage(poptContext* poptcon)
 #else
 	fprintf(stderr, "Try to run with --help or --usage option\n");
 #endif
-	exit(1);
-	/* 1 - Error in command line arguments */
+	exit(RET_USAGE);
 }
 
 void SplitToDirectoryAndFileName(poptContext *poptcon, char* pDirectory, char* pFileName)
@@ -109,14 +108,14 @@ void ConfirmOverwrite(struct ORACLEALLINONE *oraAllInOne, struct PROGRAM_OPTIONS
 	switch (programOptions->transferMode)
 	{
 	case TRANSFER_MODE_FAIL:
-		ExitWithError(oraAllInOne, 1, ERROR_NONE, "File already exists on destination\n");
+		ExitWithError(oraAllInOne, RET_FS, ERROR_NONE, "File already exists on destination\n");
 		break;
 	case TRANSFER_MODE_INTERACTIVE:
 		/* TODO: if !isatty then just fail w/o asking? */
 		fprintf (stderr, "%s: overwrite %s? ",
 		         PACKAGE, fileName);
 		if (!yesno())
-			ExitWithError(oraAllInOne, 0, ERROR_NONE, 0);
+			ExitWithError(oraAllInOne, RET_OK, ERROR_NONE, 0);
 		break;
 	}
 }
@@ -465,7 +464,7 @@ int main(int argc, const char *argv[])
 	}
 #endif
 	if (!pwdptr)
-		ExitWithError(&oraAllInOne, 1, ERROR_OS, 0);
+		ExitWithError(&oraAllInOne, RET_USAGE, ERROR_OS, 0);
 
 	OracleLogon(&oraAllInOne, connectionString, pwdptr, dbconptr, programOptions.adminMode, PACKAGE, programOptions.numberOfOracleSessions);
 
@@ -533,5 +532,5 @@ int main(int argc, const char *argv[])
 		break;
 	}
 
-	ExitWithError(&oraAllInOne, 0, ERROR_NONE, 0);
+	ExitWithError(&oraAllInOne, RET_OK, ERROR_NONE, 0);
 }
