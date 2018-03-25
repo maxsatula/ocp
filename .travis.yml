@@ -1,0 +1,10 @@
+language: c
+before_script: autoreconf --install
+script: export LD_LIBRARY_PATH=/u01/app/oracle/product/11.2.0/xe/lib && ./configure && make && .travis/test.sh
+sudo: required
+before_install:
+- .travis/oracle/download.sh
+- .travis/oracle/install.sh
+- .travis/oracle/customize.sh
+- sudo apt-get -qq update
+- sudo apt-get install -y libpopt-dev
