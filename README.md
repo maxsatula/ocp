@@ -2,6 +2,7 @@ ocp
 ===
 
 [![Build Status](https://travis-ci.org/maxsatula/ocp.svg?branch=develop)](https://travis-ci.org/maxsatula/ocp)
+[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=P3D68AUUXLNQU&lc=US&item_number=github%2docp&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donate_SM%2egif%3aNonHosted)
 
 `ocp` is a command line tool to download and upload files from/to Oracle Database directories (e.g. DATA_PUMP_DIR)
 using Oracle SQL Net connection only. Hence no other kind of filesystem access required to a database server.
