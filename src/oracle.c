@@ -190,17 +190,19 @@ void ExitWithError(struct ORACLEALLINONE *oraAllInOne, int exitCode, enum ERROR_
 
 	for (i = 0; i < MAX_ORA_SESSIONS; i++)
 	{
-		if (oraAllInOne->svchp[i])
-		{
-			OCISessionEnd(oraAllInOne->svchp[i], oraAllInOne->errhp, oraAllInOne->usrhp[i], OCI_DEFAULT);
-			OCIHandleFree(oraAllInOne->svchp[i], OCI_HTYPE_SVCCTX);
-			oraAllInOne->svchp[i] = 0;
-		}
 		if (oraAllInOne->usrhp[i])
 		{
+			OCISessionEnd(oraAllInOne->svchp[i], oraAllInOne->errhp, oraAllInOne->usrhp[i], OCI_DEFAULT);
 			OCIHandleFree(oraAllInOne->usrhp[i], OCI_HTYPE_SESSION);
 			oraAllInOne->usrhp[i] = 0;
 		}
+
+		if (oraAllInOne->svchp[i])
+		{
+			OCIHandleFree(oraAllInOne->svchp[i], OCI_HTYPE_SVCCTX);
+			oraAllInOne->svchp[i] = 0;
+		}
+
 		if (oraAllInOne->srvhp[i])
 		{
 			OCIServerDetach(oraAllInOne->srvhp[i], oraAllInOne->errhp, OCI_DEFAULT);
@@ -214,6 +216,7 @@ void ExitWithError(struct ORACLEALLINONE *oraAllInOne, int exitCode, enum ERROR_
 		OCIHandleFree(oraAllInOne->errhp, OCI_HTYPE_ERROR);
 		oraAllInOne->errhp = 0;
 	}
+
 	if (oraAllInOne->envhp)
 	{
 		OCITerminate(OCI_DEFAULT);
