@@ -1,4 +1,4 @@
-/* $OpenBSD: misc.c,v 1.127 2018/03/12 00:52:01 djm Exp $ */
+/* $OpenBSD: misc.c,v 1.136 2018/12/27 03:25:25 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2005,2006 Damien Miller.  All rights reserved.
