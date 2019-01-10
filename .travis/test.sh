@@ -1,6 +1,6 @@
 #!/bin/sh
 PATH=$PATH:$PWD/src
-CON=ocptest/test@localhost:1521/xe
+CON=ocptest/test@localhost:1521/XEPDB1
 
 # Oracle XE does not support Java, thus no tests for --ls
 

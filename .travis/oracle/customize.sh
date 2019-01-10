@@ -1,6 +1,6 @@
 #!/bin/sh -e
 
-"$ORACLE_HOME/bin/sqlplus" -L -S / AS SYSDBA <<SQL
+sqlplus -L -S sys/$ORACLE_PWD@127.0.0.1:1521/XEPDB1 AS SYSDBA <<SQL
 CREATE USER ocptest IDENTIFIED BY test;
 
 GRANT CREATE SESSION,
@@ -22,4 +22,4 @@ GRANT SELECT
    TO ocptest;
 SQL
 
-"$ORACLE_HOME/bin/expdp" system/travis logfile=expdp_system.log dumpfile=somefile.dmp directory=data_pump_dir
+expdp system/$ORACLE_PWD@127.0.0.1:1521/XEPDB1 logfile=expdp_system.log dumpfile=somefile.dmp directory=data_pump_dir
