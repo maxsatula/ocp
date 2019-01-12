@@ -75,7 +75,7 @@ void Compress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int compress
 #endif
 
 	if (ociResult)
-		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to compress file in oracle directory\n");
+		ExitWithError(oraAllInOne, RET_ORA, ERROR_OCI, "Failed to compress file in oracle directory\n");
 
 	ReleaseStmt(oraAllInOne);
 	SetSessionAction(oraAllInOne, 0);
@@ -121,7 +121,7 @@ void Uncompress(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int isKeep
 #endif
 
 	if (ociResult)
-		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to uncompress file in oracle directory\n");
+		ExitWithError(oraAllInOne, RET_ORA, ERROR_OCI, "Failed to uncompress file in oracle directory\n");
 
 	ReleaseStmt(oraAllInOne);	
 	SetSessionAction(oraAllInOne, 0);
@@ -154,7 +154,7 @@ void SubmitCompressJob(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, int
 	PrepareStmtAndBind(oraAllInOne, &oraStmtCompress);
 
 	if (ExecuteStmt(oraAllInOne))
-		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to submit a compression job\n");
+		ExitWithError(oraAllInOne, RET_ORA, ERROR_OCI, "Failed to submit a compression job\n");
 
 	printf("Submitted a job %s\n", vJobName);
 	ReleaseStmt(oraAllInOne);
@@ -183,7 +183,7 @@ void SubmitUncompressJob(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, i
 	PrepareStmtAndBind(oraAllInOne, &oraStmtUncompress);
 
 	if (ExecuteStmt(oraAllInOne))
-		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to submit a decompression job\n");
+		ExitWithError(oraAllInOne, RET_ORA, ERROR_OCI, "Failed to submit a decompression job\n");
 
 	printf("Submitted a job %s\n", vJobName);
 	ReleaseStmt(oraAllInOne);

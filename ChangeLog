@@ -1,3 +1,17 @@
+2019-01-12  Max Satula <maksym.satula@gmail.com>
+
+* Allow connection as SYSASM, SYSBKP, SYSDGD, SYSKMT, and SYSRAC
+
+2017-07-16  Max Satula <maksym.satula@gmail.com>
+
+* Add man page
+
+2017-07-12  Max Satula <maksym.satula@gmail.com>
+
+* Fix crash in --ls when Oracle directory object points
+  to a nonexistent directory
+* Do not print column names if no files found in --ls
+
 2016-04-18  Max Satula <maksym.satula@gmail.com>
 
 * Fix compiler warnings

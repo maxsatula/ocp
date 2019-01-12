@@ -182,7 +182,7 @@ select server\n\
 		}
 		else if (strcmp(vServerType, "DEDICATED"))
 		{
-			ExitWithError(oraAllInOne, 4, ERROR_NONE, "Must connect through DEDICATED server, got %s\n", vServerType);
+			ExitWithError(oraAllInOne, RET_LOGIN, ERROR_NONE, "Must connect through DEDICATED server, got %s\n", vServerType);
 		}
 		ReleaseStmt(oraAllInOne);
 	}
@@ -221,7 +221,7 @@ select server\n\
 	PrepareStmtAndBind(oraAllInOne, &oraStmtOpen);
 
 	if (ExecuteStmt(oraAllInOne))
-		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to open an Oracle remote file for %s\n",
+		ExitWithError(oraAllInOne, RET_ORA, ERROR_OCI, "Failed to open an Oracle remote file for %s\n",
 					  readingDirection ? "reading" : "writing");
 
 	ReleaseStmt(oraAllInOne);
@@ -252,21 +252,21 @@ select server\n\
 
 	if (!isStdUsed && (fp = fopen(pLocalFile, readingDirection ? (isResume ? "ab" : "wb") : "rb")) == NULL)
 	{
-		ExitWithError(oraAllInOne, -1, ERROR_OS, "Error opening a local %s file for %s\n",
+		ExitWithError(oraAllInOne, RET_DONOTEXIT, ERROR_OS, "Error opening a local %s file for %s\n",
 					  readingDirection ? "destination" : "source",
 					  readingDirection ? "writing"     : "reading");
-		/* 4 - Local filesystem related errors */
+
 		if (!readingDirection && !isKeepPartial)
 		{
 			PrepareStmtAndBind(oraAllInOne, &oraStmtClose);
 			if (ExecuteStmt(oraAllInOne))
 			{
-				ExitWithError(oraAllInOne, -1, ERROR_OCI, "Error closing an Oracle remote file\n");
+				ExitWithError(oraAllInOne, RET_DONOTEXIT, ERROR_OCI, "Error closing an Oracle remote file\n");
 			}
 			ReleaseStmt(oraAllInOne);
 			Rm(oraAllInOne, pDirectory, pRemoteFile);
 		}
-		ExitWithError(oraAllInOne, 4, ERROR_NONE, 0);
+		ExitWithError(oraAllInOne, RET_FS, ERROR_NONE, 0);
 	}
 
 	if (isStdUsed)
@@ -281,14 +281,14 @@ select server\n\
 			{
 				if (!isStdUsed)
 					fclose(fp);
-				ExitWithError(oraAllInOne, -1, ERROR_OCI, "Failed execution of %s\n",
+				ExitWithError(oraAllInOne, RET_DONOTEXIT, ERROR_OCI, "Failed execution of %s\n",
 							  oraAllInOne->currentStmt[0]->sql);
 				if (!isKeepPartial)
 				{
 					if (unlink(pLocalFile))
-						ExitWithError(oraAllInOne, 3, ERROR_OS, "Could not remove partial file %s\n", pLocalFile);
+						ExitWithError(oraAllInOne, RET_DONOTEXIT, ERROR_OS, "Could not remove partial file %s\n", pLocalFile);
 				}
-				ExitWithError(oraAllInOne, 3, ERROR_NONE, 0);
+				ExitWithError(oraAllInOne, RET_ORA, ERROR_NONE, 0);
 			}
 			else
 			{
@@ -297,13 +297,13 @@ select server\n\
 				{
 					if (!isStdUsed)
 						fclose(fp);
-					ExitWithError(oraAllInOne, -1, ERROR_OS, "Error writing to a local file\n");
+					ExitWithError(oraAllInOne, RET_DONOTEXIT, ERROR_OS, "Error writing to a local file\n");
 					if (!isKeepPartial)
 					{
 						if (unlink(pLocalFile))
-							ExitWithError(oraAllInOne, 4, ERROR_OS, "Could not remove partial file %s\n", pLocalFile);
+							ExitWithError(oraAllInOne, RET_DONOTEXIT, ERROR_OS, "Could not remove partial file %s\n", pLocalFile);
 					}
-					ExitWithError(oraAllInOne, 4, ERROR_NONE, 0);
+					ExitWithError(oraAllInOne, RET_FS, ERROR_NONE, 0);
 				}
 				cnt += vSize;
 			}
@@ -317,7 +317,7 @@ select server\n\
 			if (fseek(fp, cnt, SEEK_SET))
 			{
 				fclose(fp);
-				ExitWithError(oraAllInOne, 4, ERROR_OS, "Error setting reading position in a local file\n");
+				ExitWithError(oraAllInOne, RET_FS, ERROR_OS, "Error setting reading position in a local file\n");
 			}
 		
 		}
@@ -327,18 +327,18 @@ select server\n\
 			{
 				if (!isStdUsed)
 					fclose(fp);
-				ExitWithError(oraAllInOne, -1, ERROR_OS, "Error reading from a local file\n");
+				ExitWithError(oraAllInOne, RET_DONOTEXIT, ERROR_OS, "Error reading from a local file\n");
 				if (!isKeepPartial)
 				{
 					PrepareStmtAndBind(oraAllInOne, &oraStmtClose);
 					if (ExecuteStmt(oraAllInOne))
 					{
-						ExitWithError(oraAllInOne, -1, ERROR_OCI, "Error closing an Oracle remote file\n");
+						ExitWithError(oraAllInOne, RET_DONOTEXIT, ERROR_OCI, "Error closing an Oracle remote file\n");
 					}
 					ReleaseStmt(oraAllInOne);
 					Rm(oraAllInOne, pDirectory, pRemoteFile);
 				}
-				ExitWithError(oraAllInOne, 4, ERROR_NONE, 0);
+				ExitWithError(oraAllInOne, RET_FS, ERROR_NONE, 0);
 			}
 
 			if (OCIBindByName(oraAllInOne->currentStmt[0]->stmthp, &ociBind, oraAllInOne->errhp,
@@ -347,18 +347,18 @@ select server\n\
 			{
 				if (!isStdUsed)
 					fclose(fp);
-				ExitWithError(oraAllInOne, -1, ERROR_OCI, "Failed to bind :buffer\n");
+				ExitWithError(oraAllInOne, RET_DONOTEXIT, ERROR_OCI, "Failed to bind :buffer\n");
 				if (!isKeepPartial)
 				{
 					PrepareStmtAndBind(oraAllInOne, &oraStmtClose);
 					if (ExecuteStmt(oraAllInOne))
 					{
-						ExitWithError(oraAllInOne, -1, ERROR_OCI, "Error closing an Oracle remote file\n");
+						ExitWithError(oraAllInOne, RET_DONOTEXIT, ERROR_OCI, "Error closing an Oracle remote file\n");
 					}
 					ReleaseStmt(oraAllInOne);
 					Rm(oraAllInOne, pDirectory, pRemoteFile);
 				}
-				ExitWithError(oraAllInOne, 4, ERROR_NONE, 0);
+				ExitWithError(oraAllInOne, RET_OCIINIT, ERROR_NONE, 0);
 			}
 
 			if (ExecuteStmt(oraAllInOne))
@@ -366,19 +366,19 @@ select server\n\
 				if (!isStdUsed)
 					fclose(fp);
 				OCIHandleFree(ociBind, OCI_HTYPE_BIND);
-				ExitWithError(oraAllInOne, -1, ERROR_OCI, "Failed execution of %s\n",
+				ExitWithError(oraAllInOne, RET_DONOTEXIT, ERROR_OCI, "Failed execution of %s\n",
 							  oraAllInOne->currentStmt[0]->sql);
 				if (!isKeepPartial)
 				{
 					PrepareStmtAndBind(oraAllInOne, &oraStmtClose);
 					if (ExecuteStmt(oraAllInOne))
 					{
-						ExitWithError(oraAllInOne, -1, ERROR_OCI, "Error closing an Oracle remote file\n");
+						ExitWithError(oraAllInOne, RET_DONOTEXIT, ERROR_OCI, "Error closing an Oracle remote file\n");
 					}
 					ReleaseStmt(oraAllInOne);
 					Rm(oraAllInOne, pDirectory, pRemoteFile);
 				}
-				ExitWithError(oraAllInOne, 4, ERROR_NONE, 0);
+				ExitWithError(oraAllInOne, RET_ORA, ERROR_NONE, 0);
 			}
 			OCIHandleFree(ociBind, OCI_HTYPE_BIND);
 			cnt += vActualSize;
@@ -396,7 +396,7 @@ select server\n\
 	PrepareStmtAndBind(oraAllInOne, &oraStmtClose);
 	if (ExecuteStmt(oraAllInOne))
 	{
-		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Error closing an Oracle remote file\n");
+		ExitWithError(oraAllInOne, RET_ORA, ERROR_OCI, "Error closing an Oracle remote file\n");
 	}
 	ReleaseStmt(oraAllInOne);
 	SetSessionAction(oraAllInOne, 0);

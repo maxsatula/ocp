@@ -58,7 +58,7 @@ end;",
         PrepareStmtAndBind(oraAllInOne, &oraStmtFattr);
 
         if (ExecuteStmt(oraAllInOne))
-                ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to get remote file attributes\n");
+                ExitWithError(oraAllInOne, RET_ORA, ERROR_OCI, "Failed to get remote file attributes\n");
 
         ReleaseStmt(oraAllInOne);
 }

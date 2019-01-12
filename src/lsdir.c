@@ -81,7 +81,7 @@ SELECT d.directory_name,\n\
 	}
 
 	if (ociResult != OCI_NO_DATA)
-		ExitWithError(oraAllInOne, 4, ERROR_OCI, "Failed to list oracle directories\n");
+		ExitWithError(oraAllInOne, RET_ORA, ERROR_OCI, "Failed to list oracle directories\n");
 
 	ReleaseStmt(oraAllInOne);
 	SetSessionAction(oraAllInOne, 0);

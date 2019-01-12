@@ -1,0 +1,587 @@
+.TH OCP 1 2019-01-12 GNU "ocp man page"
+
+.SH NAME
+ocp \- copy a file from/to an Oracle database server
+
+.SH SYNOPSIS
+.BI ocp " CONNECTION ORACLEDIRECTORY" : "SOURCE TARGET"
+.RI [ OPTIONS " ...]"
+
+.PP
+.BI ocp " CONNECTION SOURCE ORACLEDIRECTORY" :\c
+.RI [ TARGET "] [" OPTIONS " ...]"
+
+.PP
+.BI ocp " CONNECTION " \-\-list\-directories
+.RI [ OPTIONS " ...]"
+
+.PP
+.BI ocp " CONNECTION " \-\-ls= ORACLEDIRECTORY
+.RI [ PATTERN " ...] [" OPTIONS " ...]"
+
+.PP
+.BI ocp " CONNECTION " \-\-rm " ORACLEDIRECTORY" : FILENAME
+.RI [ OPTIONS " ...]"
+
+.PP
+.BI ocp " CONNECTION " \-\-gzip " ORACLEDIRECTORY" : FILENAME
+.RI [ OPTIONS " ...]"
+
+.PP
+.BI ocp " CONNECTION " \-\-gunzip " ORACLEDIRECTORY" : FILENAME
+.RI [ OPTIONS " ...]"
+
+.PP
+.BI ocp " CONNECTION "
+.BR \-\-install | \-\-deinstall
+.RI [ OPTIONS " ...]"
+
+.PP
+.BR "ocp \-?" | \-\-help | \-\-usage
+
+.SH DESCRIPTION
+.PP
+.B ocp
+is a command line tool to transfer files between a local system and an
+Oracle database server via database connection.
+.PP
+Here are Oracle privileges required in most cases.
+.IP \(bu
+CREATE SESSION
+.IP \(bu
+READ ON DIRECTORY
+.I ORACLEDIRECTORY
+.IP \(bu
+WRITE ON DIRECTORY
+.I ORACLEDIRECTORY
+.IP \(bu
+EXECUTE ON SYS.UTL_FILE, which is granted to PUBLIC by default.
+.PP
+Some special cases require additional privileges, which are described
+later.
+.PP
+.B ocp
+can run in multiple modes, as described below.
+
+.SS File transfer
+File transfer is a primary purpose of
+.BR ocp .
+When
+.IR SOURCE " and " TARGET
+are specified as arguments, then
+.B ocp
+copies a file.
+
+.PP
+If
+.I ORACLEDIRECTORY
+with a following colon (:) precedes
+.IR SOURCE ,
+then a file is searched on a database server and downloaded to a path
+specified as
+.IR TARGET .
+Correspondingly, if
+.I ORACLEDIRECTORY
+with a following colon precedes
+.IR TARGET ,
+then a local
+.I SOURCE
+file is uploaded to a database server.
+
+.PP
+A local file can be either specified as a simple filename, a relative
+or an absolute path. For a remote side, only Oracle directory name and
+filename separated by a colon are allowed.
+
+.PP
+In download mode a local target may refer to a directory, in this case
+a file is copied with the name unchanged. For example, a simple dot
+.RB ( . )
+tells to copy a file into a current directory with the same name.
+
+.PP
+In upload mode a target file
+name is optional, but the colon must be specified after an Oracle
+directory name. If remote filename is omitted, a file is copied with
+the name unchanged.
+
+.PP
+To be able to use
+.B ocp
+in a pipeline, a dash (\-) can be specified as a local filename. That
+means standard input is used during upload, or standard output is used
+during download. In this case remote filename cannot be omitted.
+
+.SS File transfer with on the fly compression
+Similar to a regular file transfer, but the file contents is
+compressed on the source site (either local or remote) before being
+transferred over a network to target, where it is immediately
+decompressed back to original.  Therefore, compressed data is used
+temporary just to reduce network traffic. That might be a good option
+for slow networks, but where extra CPU load is affordable. In both
+upload and download modes, the whole compressed file is temporarily
+placed into a Temporary LOB object, so make sure that TEMP tablespace
+is large enough.
+
+.PP
+On the fly compression turns on when any of the following switches
+specified during transfer:
+.BR \-1 .. \-9 , \-\-fast , \-\-best .
+
+.PP
+On the fly compression requires EXECUTE ON SYS.UTL_COMPRESS privilege,
+which is granted to PUBLIC by default.
+
+.SS List Oracle directories
+To list all the Oracle directories accessible to a database user, use
+.B \-\-list\-directories
+option.
+
+.PP
+Output is one Oracle directory per line, with two characters
+indicating privileges, Oracle directory name, and the full path name
+of the operating system directory of the database server, enclosed in
+parentheses.
+
+.PP
+The first character in each line tells whether a database user can
+read the directory, and its meaning is as follows.
+.TP
+.B \-
+no read privilege
+.TP
+.B r
+READ ON DIRECTORY
+.TP
+.B R
+READ ON DIRECTORY WITH GRANT OPTION
+
+.PP
+Similarly, the second character in each line tells whether a database user can
+write into the directory, and its meaning is as follows.
+.TP
+.B \-
+no write privilege
+.TP
+.B w
+WRITE ON DIRECTORY
+.TP
+.B W
+WRITE ON DIRECTORY WITH GRANT OPTION
+
+.SS List files in Oracle directory
+To list files of an Oracle directory, use
+.B \-\-ls
+option and specify an Oracle directory name as an argument.
+Optionally, one or more file matching patterns can be specified as
+additional command line arguments to filter an output.
+.PP
+Beware while using an asterisk wildcard
+.RB ( * )
+in patterns, as shell may resolve it with some filename on a local
+system before passing to
+.BR ocp ,
+so most likely asterisks must be escaped by a backslash in UNIX
+systems command line.
+.PP
+Java permissions are required.
+.PP
+To be able to list filenames, run as DBA
+.PP
+.BI "dbms_java.grant_permission( '" user "', 'SYS:java.io.FilePermission', '" path "', 'read' )"
+.PP
+The second permission is recommended but not mandatory. It allows to
+view file sizes and last modified times, not just filenames. Also, it
+allowes to calculate MD5 and SHA1 hashes. If you need any of these,
+run as DBA
+.PP
+.BI "dbms_java.grant_permission( '" user "', 'SYS:java.io.FilePermission', '" path "/*', 'read' )"
+.PP
+Where
+.I user
+is an Oracle user and
+.I path
+is the full path name of the operating system directory of the
+database server.
+
+.PP
+Listing files in Oracle directory requires some objects to be created
+in the Oracle database beforehand, which can be done with help of
+.B \-\-install
+option.
+
+.SS Remove file from Oracle directory
+Remove a file from a database server. Use
+.B \-\-rm
+and specify Oracle directory name and filename separated by a colon.
+
+.SS Compress and decompress file in Oracle directory
+Files in Oracle directory can be remotely compressed and decompressed
+using
+.BR gzip (1)
+compatible algorithm. The operation runs on a Database server and does
+not involve any file transfer over network.
+
+When compressing
+.RB ( \-\-gzip " option),"
+a
+.B .gz
+suffix is added to a filename.
+Conversely, when decompressing
+.RB ( \-\-gunzip " option),"
+the suffix is removed.
+
+.PP
+The whole compressed file is temporarily placed into a Temporary LOB
+object, so make sure that TEMP tablespace is large enough.
+
+.PP
+Compression and decompression require EXECUTE ON SYS.UTL_COMPRESS
+privilege, which is granted to PUBLIC by default.
+
+.SS Supporting objects maintenance
+List files in Oracle directory is the only feature that requires some
+supporting objects to reside in a database.
+
+.PP
+Thus, before using
+.BR \-\-ls ,
+run
+.B ocp
+with
+.B \-\-install
+option first to install those objects.
+It is safe to run
+.BR ocp " with " \-\-install
+multiple times when objects are already in the database, as it drops
+and recreates them.
+The objects are installed locally in the database user schema, which
+is why these objects have to be installed for every Oracle account
+which intends to list files in Oracle directory, even if these
+accounts are in the same database.
+
+CREATE TYPE and CREATE PROCEDURE privileges are required at the time
+of supporting objects installation.
+
+.PP
+Once
+.BR \-\-ls
+is not needed anymore,
+.B \-\-deinstall
+option may be used to clean up the mess by dropping the supported
+objects previously created by
+.BR \-\-install
+option.
+
+.SS Monitoring
+.PP
+.B ocp
+activities may be monitored in Oracle database.
+MODULE column of V$SESSION view has a value of \(aqocp\(aq, which is one of the ways how
+.B ocp
+sessions can be identified,
+and ACTION column points out what exact kind of acivity is happening.
+Also, whenever (de-)compression is involved, the progress can be
+tracked via V$SESSION_LONGOPS view.
+
+.SS License warning
+.PP
+Whenever compression or decompression is involved, either standalone or as a part of file transfer,
+.B ocp
+uses UTL_COMPRESS package. There is controversy whether use of this
+package requries a license for Oracle Advanced Compression option,
+please contact your Oracle representative for details.
+Author of
+.B ocp
+program is not responsible for any legal consequences
+caused by possible Oracle licensing violation while using
+.BR ocp .
+
+.SH OPTIONS
+
+.TP
+.B \-b \-\-background
+Submit an Oracle Scheduler job and exit immediately.
+.B ocp
+does not wait until (de-)compression finishes.
+Can only be specified together with either
+.B \-\-gzip
+or
+.BR \-\-gunzip .
+Requires CREATE JOB privilege.
+
+.TP
+.B \-c \-\-continue
+Continue copying a partially transferred file.  This is useful when
+you want to finish up a transfer started by a previous instance of
+.BR ocp ,
+or by another program.
+Implies
+.B \-\-keep\-partial
+and overrides previous
+.B \-f \-i
+options.
+Applicable only for file transfer mode, with or without on the fly
+compression.
+
+.TP
+.B  \-f \-\-force
+If a destination file already exists, overwrite it without asking.
+Overrides previous
+.B \-i \-c
+options.
+Applicable for file transfer mode, with or without on the fly
+compression, and for stand alone compression and decompression.
+
+.TP
+.B \-i \-\-interactive
+Prompt before overwrite (overrides previous
+.B \-f \-c
+options).
+Applicable for file transfer mode, with or without on the fly
+compression, and for stand alone compression and decompression.
+
+.TP
+.B \-k \-\-keep
+Keep (do not delete) source file after (de-)compression finishes.
+Can only be used with either
+.BR \-\-gzip " or " \-\-gunzip .
+
+.TP
+.B \-\-keep\-partial
+If an error or another sort of interruption occurred during file
+transfer, do not delete partially transferred file on
+destination. Keeping an incomplete file may be useful to retry transfer with
+.B \-\-continue
+opton.
+Applicable only for file transfer mode, with or without on the fly
+compression.
+
+.TP
+.B \-\-md5
+Calculate MD5 hashes on listed files and display them instead of size
+and last modified time columns.
+Can only be used with
+.BR \-\-ls .
+
+.TP
+.B \-\-sha1
+Calculate SHA1 hashes on listed files and display them instead of size
+and last modified time columns.
+Can only be used with
+.BR \-\-ls .
+
+.TP
+.B \-\-sysdba
+Connect to a database as SYSDBA
+.TP
+.B \-\-sysoper
+Connect to a database as SYSOPER
+.TP
+.B \-\-sysasm
+Connect to a database as SYSASM
+.TP
+.B \-\-sysbkp
+Connect to a database as SYSBKP
+.TP
+.B \-\-sysdgd
+Connect to a database as SYSDGD
+.TP
+.B \-\-syskmt
+Connect to a database as SYSKMT
+.TP
+.B \-\-sysrac
+Connect to a database as SYSRAC
+
+.TP
+.B \-\-usage
+Display brief usage message
+	
+.TP
+.BI \- # " \-\-fast \-\-best"
+Regulate the speed of compression using the specified digit
+.IR # ,
+where
+.B \-1
+or
+.B \-\-fast
+indicates the fastest compression method (less compression)
+and
+.B \-9
+or
+.B \-\-best
+indicates the slowest compression method (best compression).
+The default compression level is
+.BR \-6
+(that is, biased towards high compression at expense of speed).
+Can only be specified for file transfer or when using 
+.BR \-\-gzip .
+
+.TP
+.B \-? \-\-help
+Show help message
+
+.SH "EXIT STATUS"
+
+.IP 0
+Success
+
+.IP 1
+Error in command line arguments
+
+.IP 2
+Error in OCI object initialization
+
+.IP 3
+Failed to login to a database
+
+.IP 4
+Local filesystem related error
+
+.IP 5
+Oracle error
+
+.IP 6
+(De-)compression error on a local side
+
+.IP 7
+Error listing files in Oracle directory
+
+.SH ENVIRONMENT
+
+.PP
+Since
+.B ocp
+connects to an Oracle database, it requires Oracle client installed on
+the system. Either full or Instant Client is good.
+
+.SH BUGS
+
+When downloading a file through SHARED server connection, Oracle may
+give corrupt data. Upload works fine. Nonetheless, it is poor practice
+to use SHARED server for file transfer.
+.B ocp
+protects from download attempts via SHARED server connection whenever
+possible. The best option is to use DEDICATED server connection
+instead, however if by some reason environment does not allow that,
+use on the fly compression (does not matter which compression method)
+as a workaround.
+
+.SH EXAMPLES
+
+.PP
+.B ocp scott/tiger@orcl DATA_PUMP_DIR:myfile.dmp . \-i
+.PP
+Connect as user
+.B scott
+with password
+.B tiger
+using connection string
+.B orcl
+and download
+.B myfile.dmp
+from Oracle directory
+.B DATA_PUMP_DIR
+to a current directory of the local system. If a file already exists
+in the current directory, prompt before overwrite.
+
+.PP
+.B ocp scott@orcl file2.dmp DATA_PUMP_DIR: \-c
+.PP
+As user
+.B scott
+connect to
+.B orcl
+database, ask for a password interactively,
+and upload
+.B file2.dmp
+to Oracle directory
+.B DATA_PUMP_DIR\c
+, keeping the same filename. If a file already exists on the Oracle
+side, assume it is partially uploaded file and resume transfer
+operation from the point it was interrupted.
+
+.PP
+.B ocp /@oraclehost:1521/mydb.example.com MY_PUMP_DIR:source.dmp ~/Downloads/dest.dmp \-9
+.PP
+Use External Password Store (Oracle Wallet) for database
+authentication and easy connect naming method, download
+.B source.dmp
+and save it as
+.B dest.dmp
+on a local file system in
+.B Downloads
+subdirectory of the home directory. Use best on the fly compression
+method.
+
+.PP
+.B ocp /@canada SRC_DIR:myfile.dmp \- | ocp /@australia \- DEST_DIR:myfile.dmp
+.PP
+If
+.BR canada " and " australia
+databases cannot access each other over network directly, two
+.B ocp
+invocations can be pipelined on a third intermediate system which have
+connection to both databases, as shown above.
+
+.PP
+.B ocp user123/weakpassword@mydb \-\-list-directories
+.PP
+List Oracle directories and access levels for
+.B user123
+database user.
+
+.PP
+.B ocp /@mydb \-\-install
+.PP
+.B ocp /@mydb \-\-ls=DATA_PUMP_DIR bkp_201[0\-5]\e*.dmp expdp_{prod,test,qa,dev}.dmp
+.PP
+Install supporting objects before the first use of
+.B \-\-ls
+and then list files (with sizes and last modified times, if user has privileges)
+matching two patterns.
+
+.PP
+.B ocp /@mydb \-\-ls=DATA_PUMP_DIR \-\-sha1
+.PP
+List all files in
+.B DATA_PUMP_DIR
+Oracle directory and calculate their SHA1 hashes.
+
+.PP
+.B ocp sys/oracle@proddb \-\-gzip MY_DIR2:bigfile.dmp \-f \-\-sysdba
+.PP
+Connect as
+.B SYS
+user with
+.B SYSDBA
+role and compress
+.B bigfile.dmp
+file in
+.B MY_DIR2
+Oracle directory using default compression method into
+.BR bigfile.dmp.gz .
+If file
+.B bigfile.dmp.gz
+already exists, overwrite it without asking.
+Wait until Oracle server completes compression.
+
+.PP
+.B ocp /@proddb \-\-gunzip DATA_PUMP_DIR:another_file.dmp.gz \-k \-b
+.PP
+Submit an Oracle Scheduler job to decompress
+.B another_file.dmp.gz
+into
+.B another_file.dmp
+and exit immediately without waiting for completion.  Once job
+finishes decompression, it will not delete an original file
+.BR another_file.dmp.gz .
+
+.SH AUTHOR
+
+Written by Max Satula.
+
+.SH "SEE ALSO"
+.UR https://github.com/maxsatula/ocp
+Project page
+.UE

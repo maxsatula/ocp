@@ -35,8 +35,7 @@
 /*
  * Modified by Max Satula by adding of an extra include below
  */
-#define __need_IOV_MAX
-#include <stdio.h>
+#define __USE_XOPEN
 #include <limits.h>
 
 #include "atomicio.h"

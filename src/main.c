@@ -65,8 +65,7 @@ void ExitWithUsage(poptContext* poptcon)
 #else
 	fprintf(stderr, "Try to run with --help or --usage option\n");
 #endif
-	exit(1);
-	/* 1 - Error in command line arguments */
+	exit(RET_USAGE);
 }
 
 void SplitToDirectoryAndFileName(poptContext *poptcon, char* pDirectory, char* pFileName)
@@ -109,14 +108,14 @@ void ConfirmOverwrite(struct ORACLEALLINONE *oraAllInOne, struct PROGRAM_OPTIONS
 	switch (programOptions->transferMode)
 	{
 	case TRANSFER_MODE_FAIL:
-		ExitWithError(oraAllInOne, 1, ERROR_NONE, "File already exists on destination\n");
+		ExitWithError(oraAllInOne, RET_FS, ERROR_NONE, "File already exists on destination\n");
 		break;
 	case TRANSFER_MODE_INTERACTIVE:
 		/* TODO: if !isatty then just fail w/o asking? */
 		fprintf (stderr, "%s: overwrite %s? ",
 		         PACKAGE, fileName);
 		if (!yesno())
-			ExitWithError(oraAllInOne, 0, ERROR_NONE, 0);
+			ExitWithError(oraAllInOne, RET_OK, ERROR_NONE, 0);
 		break;
 	}
 }
@@ -189,8 +188,13 @@ int main(int argc, const char *argv[])
 		{ "list-directories", '\0', POPT_ARG_NONE, 0, ACTION_LSDIR, "List Oracle directories" },
 		{ "ls", '\0', POPT_ARG_STRING, &programOptions.lsDirectoryName, ACTION_LS, "List files in Oracle directory", "DIRECTORY" },
 		{ "rm", '\0', POPT_ARG_NONE, 0, ACTION_RM, "Remove file from Oracle directory" },
-		{ "sysdba", '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSDBA, "Connect as SYSDBA" },
+		{ "sysdba",  '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSDBA,  "Connect as SYSDBA" },
 		{ "sysoper", '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSOPER, "Connect as SYSOPER" },
+		{ "sysasm",  '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSASM,  "Connect as SYSASM" },
+		{ "sysbkp",  '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSBKP,  "Connect as SYSBKP" },
+		{ "sysdgd",  '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSDGD,  "Connect as SYSDGD" },
+		{ "syskmt",  '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSKMT,  "Connect as SYSKMT" },
+		{ "sysrac",  '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSRAC,  "Connect as SYSRAC" },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, transferModeOptions, 0, "Transfer options:" },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, compressionOptions, 0, "Compression options:" },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, lsOptions, 0, "File list options:" },
@@ -465,7 +469,7 @@ int main(int argc, const char *argv[])
 	}
 #endif
 	if (!pwdptr)
-		ExitWithError(&oraAllInOne, 1, ERROR_OS, 0);
+		ExitWithError(&oraAllInOne, RET_USAGE, ERROR_OS, 0);
 
 	OracleLogon(&oraAllInOne, connectionString, pwdptr, dbconptr, programOptions.adminMode, PACKAGE, programOptions.numberOfOracleSessions);
 
@@ -533,5 +537,5 @@ int main(int argc, const char *argv[])
 		break;
 	}
 
-	ExitWithError(&oraAllInOne, 0, ERROR_NONE, 0);
+	ExitWithError(&oraAllInOne, RET_OK, ERROR_NONE, 0);
 }

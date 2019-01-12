@@ -1,5 +1,5 @@
 /*****************************************************************************
-Copyright (C) 2015  Max Satula
+Copyright (C) 2018  Max Satula
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -17,33 +17,19 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 *****************************************************************************/
 
-#if HAVE_CONFIG_H
-# include <config.h>
+#ifndef _EXITSTATUS_H_
+#define _EXITSTATUS_H_
+
+/* Program return values */
+
+#define RET_DONOTEXIT -1  /* Print error message but do not exit program */
+#define RET_OK         0  /* Success */
+#define RET_USAGE      1  /* Error in command line arguments */
+#define RET_OCIINIT    2  /* Error in OCI object initialization */
+#define RET_LOGIN      3  /* Failed to login to a database */
+#define RET_FS         4  /* Local filesystem related error */
+#define RET_ORA        5  /* Oracle error */
+#define RET_ZLIB       6  /* LIBZ error */
+#define RET_LS         7  /* Error listing files in Oracle directory */
+
 #endif
-
-#include <oci.h>
-#include "oracle.h"
-#include "ocp.h"
-
-void Rm(struct ORACLEALLINONE *oraAllInOne, char* pDirectory, char* pFileName)
-{
-	struct BINDVARIABLE oraBindsRm[] =
-	{
-		{ 0, SQLT_STR, ":directory", pDirectory, ORA_IDENTIFIER_SIZE + 1 },
-		{ 0, SQLT_STR, ":filename",  pFileName,  MAX_FMT_SIZE },
-		{ 0 }
-	};
-
-	struct ORACLESTATEMENT oraStmtRm = {
-	       "BEGIN utl_file.fremove(:directory, :filename); END;",
-	       0, oraBindsRm, NO_ORACLE_DEFINES };
-
-	SetSessionAction(oraAllInOne, "RM");
-	PrepareStmtAndBind(oraAllInOne, &oraStmtRm);
-
-	if (ExecuteStmt(oraAllInOne))
-		ExitWithError(oraAllInOne, RET_ORA, ERROR_OCI, "Failed to remove file in oracle directory\n");
-
-	ReleaseStmt(oraAllInOne);	
-	SetSessionAction(oraAllInOne, 0);
-}

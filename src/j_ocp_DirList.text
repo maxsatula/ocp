@@ -20,7 +20,7 @@ import java.util.regex.PatternSyntaxException;\n\
 public class j_ocp_DirList\n\
 {\n\
 	public static ARRAY getList(String directory, String pattern, String hashAlgorithm)\n\
-		throws SQLException, NoSuchAlgorithmException\n\
+		throws SQLException, NoSuchAlgorithmException, FileNotFoundException\n\
 	{\n\
 		Connection conn = new OracleDriver().defaultConnection();\n\
 		ArrayDescriptor arrayDescriptor = new ArrayDescriptor(\"T_OCP_FILE_LIST\", conn);\n\
@@ -41,6 +41,9 @@ public class j_ocp_DirList\n\
 			files = path.listFiles(globFilter);\n\
 		} else {\n\
 			files = path.listFiles();\n\
+		}\n\
+		if (files == null) {\n\
+			throw new FileNotFoundException(directory);\n\
 		}\n\
 		Object[][] result = new Object[files.length][4];\n\
 		for (int i = 0; i < files.length; i++)\n\

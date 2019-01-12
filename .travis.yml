@@ -1,0 +1,30 @@
+language: c
+services:
+  - docker
+env:
+  - ORACLE_HOME=$HOME/instantclient_18_3 LD_LIBRARY_PATH=$ORACLE_HOME PATH=$ORACLE_HOME:$PATH
+addons:
+  apt:
+    update: true
+    packages:
+      - libpopt-dev
+sudo: required
+before_install:
+- echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
+- docker run --detach
+             --privileged
+             --publish 127.0.0.1:1521:1521
+             --env ORACLE_PWD
+             maxsatula/agile:18.4.0-xe
+- |
+  (cd $HOME
+  for t in basic sdk sqlplus tools
+  do
+    f=instantclient-${t}-linux.x64-18.3.0.0.0dbru.zip
+    wget https://github.com/bumpx/oracle-instantclient/raw/master/$f
+    unzip -q $f && rm $f
+  done)
+- .travis/oracle/wait.sh
+- .travis/oracle/customize.sh
+before_script: autoreconf --install
+script: ./configure --with-oci=y --with-oci-include=$ORACLE_HOME/sdk/include --with-oci-lib=$ORACLE_HOME && make && .travis/test.sh

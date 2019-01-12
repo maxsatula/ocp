@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #define _ORACLE_H_
 
 #include <oci.h>
+#include "exitstatus.h"
 
 #define MAX_FMT_SIZE 4096
 #define ORA_IDENTIFIER_SIZE 30
