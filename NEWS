@@ -1,4 +1,4 @@
-ocp <future-version>
+ocp 0.3
 
 * added man page
 * added --sysasm, --sysbkp, --sysdgd, --syskmt, and --sysrac options
