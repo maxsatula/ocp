@@ -1,6 +1,8 @@
 ocp <future-version>
 
 * added man page
+* added --sysasm, --sysbkp, --sysdgd, --syskmt, and --sysrac options
+  to connect to Oracle with roles introduced in 12c
 
 ----------------------------------------------------------------------------
 

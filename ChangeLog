@@ -1,3 +1,7 @@
+2019-01-12  Max Satula <maksym.satula@gmail.com>
+
+* Allow connection as SYSASM, SYSBKP, SYSDGD, SYSKMT, and SYSRAC
+
 2017-07-16  Max Satula <maksym.satula@gmail.com>
 
 * Add man page
