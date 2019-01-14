@@ -1,0 +1,10 @@
+#!/bin/sh -e
+
+$OCP $ORACLE_CONNECTION --list-directories
+$OCP $ORACLE_CONNECTION DATA_PUMP_DIR:somefile.dmp localfile.dmp
+$OCP $ORACLE_CONNECTION -9 DATA_PUMP_DIR:somefile.dmp onthefly.dmp
+$OCP $ORACLE_CONNECTION -9 onthefly.dmp DATA_PUMP_DIR:
+$OCP $ORACLE_CONNECTION --gzip DATA_PUMP_DIR:somefile.dmp
+$OCP $ORACLE_CONNECTION --install
+$OCP $ORACLE_CONNECTION --ls DATA_PUMP_DIR
+$OCP $ORACLE_CONNECTION --rm DATA_PUMP_DIR:onthefly.dmp

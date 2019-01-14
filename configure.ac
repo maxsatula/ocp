@@ -3,6 +3,7 @@
 
 AC_PREREQ([2.63])
 AC_INIT([ocp],[0.3],[Max Satula <maksym.satula@gmail.com>])
+AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([src/ocp.h])
@@ -46,5 +47,7 @@ AC_SEARCH_LIBS([clock_gettime], [rt])
 AC_CONFIG_FILES([Makefile
 	progressmeter/Makefile
 	yesno/Makefile
-	src/Makefile])
+	src/Makefile
+	test/Makefile])
+AC_REQUIRE_AUX_FILE([test-driver])
 AC_OUTPUT

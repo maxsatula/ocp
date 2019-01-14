@@ -27,4 +27,4 @@ before_install:
 - .travis/oracle/wait.sh
 - .travis/oracle/customize.sh
 before_script: autoreconf --install
-script: ./configure --with-oci=y --with-oci-include=$ORACLE_HOME/sdk/include --with-oci-lib=$ORACLE_HOME && make && .travis/test.sh
+script: ./configure --with-oci=y --with-oci-include=$ORACLE_HOME/sdk/include --with-oci-lib=$ORACLE_HOME && make check ORACLE_CONNECTION=ocptest/test@localhost:1521/XEPDB1
