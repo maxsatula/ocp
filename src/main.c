@@ -190,11 +190,13 @@ int main(int argc, const char *argv[])
 		{ "rm", '\0', POPT_ARG_NONE, 0, ACTION_RM, "Remove file from Oracle directory" },
 		{ "sysdba",  '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSDBA,  "Connect as SYSDBA" },
 		{ "sysoper", '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSOPER, "Connect as SYSOPER" },
+#if OCI_MAJOR_VERSION >= 12
 		{ "sysasm",  '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSASM,  "Connect as SYSASM" },
 		{ "sysbkp",  '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSBKP,  "Connect as SYSBKP" },
 		{ "sysdgd",  '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSDGD,  "Connect as SYSDGD" },
 		{ "syskmt",  '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSKMT,  "Connect as SYSKMT" },
 		{ "sysrac",  '\0', POPT_ARG_VAL, &programOptions.adminMode, OCI_SYSRAC,  "Connect as SYSRAC" },
+#endif
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, transferModeOptions, 0, "Transfer options:" },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, compressionOptions, 0, "Compression options:" },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, lsOptions, 0, "File list options:" },

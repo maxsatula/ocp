@@ -242,12 +242,12 @@ if (envh) OCIHandleFree(envh, OCI_HTYPE_ENV);
     if test "$oci_header_found" = "yes" -a "$oci_lib_found" = "yes" -a \
         -n "$oracle_version_req"; then
 
-        oracle_version_major=`cat $oracle_include_dir/oci.h \
+        oracle_version_major=`cat $oracle_include_dir/oci*.h \
                              | grep '#define.*OCI_MAJOR_VERSION.*' \
                              | sed -e 's/#define OCI_MAJOR_VERSION  *//' \
                              | sed -e 's/  *\/\*.*\*\///'`
 
-        oracle_version_minor=`cat $oracle_include_dir/oci.h \
+        oracle_version_minor=`cat $oracle_include_dir/oci*.h \
                              | grep '#define.*OCI_MINOR_VERSION.*' \
                              | sed -e 's/#define OCI_MINOR_VERSION  *//' \
                              | sed -e 's/  *\/\*.*\*\///'`
